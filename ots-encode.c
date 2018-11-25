@@ -12,10 +12,10 @@ typedef unsigned char u8;
 #define SUPPORTED_VERSION 0x1
 
 // 160-bit hash
-#define MIN_FILE_DIGEST_LENGTH 20 
+#define MIN_FILE_DIGEST_LENGTH 20
 
 // 256-bit hash
-#define MAX_FILE_DIGEST_LENGTH 32 
+#define MAX_FILE_DIGEST_LENGTH 32
 
 #define peek_cursor(len) (cursor->p + (len) > cursor->end)
 
@@ -185,7 +185,7 @@ static int parse_crypto_op(struct cursor *cursor, struct ots_token *token) {
     }
 
     #undef consume_hash
-    
+
     // backtrack on failure
     (cursor->p)--;
 
@@ -240,7 +240,7 @@ static enum parse_state parse_ots_proof(u8 *buf, int len, ots_token_cb *cb) {
     cursor->end = buf + len;
 
     if (!consume_header(cursor, cb))
-        return cursor->state; 
+        return cursor->state;
 
     token.tag = TOK_FILEHASH;
     (*cb)(&token);
