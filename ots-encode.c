@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <ctype.h>
 
+#define ATTESTATION_TAG_SIZE 8
 #define STR_DETAIL(x) #x
 #define STR(x) STR_DETAIL(x)
 typedef unsigned char u8;
@@ -17,14 +18,11 @@ typedef unsigned char u8;
 // 256-bit hash
 #define MAX_FILE_DIGEST_LENGTH 32
 
-#define peek_cursor(len) (cursor->p + (len) > cursor->end)
+#define memeq(d, d2, len) (memcmp(d, d2, len) == 0)
 
-#define consume_tag(tag)                        \
-    do {                                        \
-        if (!consume_byte(cursor)) return 0;    \
-        tag = *(cursor->p - 1);                 \
-    }                                           \
-    while (0)
+#define attestation_eq(a1, a2) memeq(a1, a2, ATTESTATION_TAG_SIZE)
+
+#define peek_cursor(len) (cursor->p + (len) > cursor->end)
 
 #define check_cursor(len)                           \
     do {                                            \
@@ -41,6 +39,13 @@ enum parse_state {
     ERR_OVERFLOW,
     ERR_CORRUPT,
     ERR_UNSUPPORTED_VERSION,
+};
+
+enum attestation_type {
+    ATTESTATION_PENDING,
+    ATTESTATION_BITCOIN_BLOCK_HEADER,
+    ATTESTATION_LITECOIN_BLOCK_HEADER,
+    ATTESTATION_UNKNOWN,
 };
 
 enum op_class {
@@ -98,6 +103,19 @@ static const u8 proof_magic[] = {
     0x89, 0xe2, 0xe8, 0x84, 0xe8, 0x92, 0x94
 };
 
+static const u8 pending_attestation[ATTESTATION_TAG_SIZE] = {
+    0x83, 0xdf, 0xe3, 0x0d, 0x2e, 0xf9, 0x0c, 0x8e
+};
+
+static const u8 bitcoin_block_header_attestation[ATTESTATION_TAG_SIZE] = {
+    0x05, 0x88, 0x96, 0x0d, 0x73, 0xd7, 0x19, 0x01
+};
+
+static const u8 litecoin_block_header_attestation[ATTESTATION_TAG_SIZE] = {
+    0x06, 0x86, 0x9a, 0x0d, 0x73, 0xd7, 0x1b, 0x45
+};
+
+
 static char *errmsg = "no additional information";
 
 static void init_cursor(struct cursor *cursor) {
@@ -142,9 +160,42 @@ static int consume_version(struct cursor *cursor, u8 *ver) {
     return ok;
 }
 
+static int consume_op(struct cursor *cursor, struct ots_token *token) {
+}
+
+static enum attestation_type parse_attestation_type(u8 *data) {
+    if (attestation_eq(data, bitcoin_block_header_attestation))
+        return ATTESTATION_BITCOIN_BLOCK_HEADER;
+    else if (attestation_eq(data, pending_attestation))
+        return ATTESTATION_PENDING;
+    else if (attestation_eq(data, litecoin_block_header_attestation))
+        return ATTESTATION_LITECOIN_BLOCK_HEADER;
+
+    return ATTESTATION_UNKNOWN;
+}
+
+static int consume_attestation(struct cursor *cursor, struct ots_token *token) {
+    u8 *tag = cursor->p;
+    if (!consume_bytes(cursor, NULL, ATTESTATION_TAG_SIZE))
+        return 0;
+
+    enum attestation_type type = parse_attestation_type(tag);
+    if (type == ATTESTATION_UNKNOWN) {
+        cursor->state = ERR_CORRUPT
+        return 0;
+    }
+}
+
 static int consume_tag_or_attestation(struct cursor *cursor, u8 tag,
                                       struct ots_token *token) {
+    if (tag == 0) {
+        consume_attestation(cursor, token);
+    }
 }
+
+#define consume_tag(tag)                        \
+    if (!consume_byte(cursor)) return 0;    \
+    tag = *(cursor->p - 1)
 
 static int consume_timestamp(struct cursor *cursor, struct ots_token *token) {
     u8 tag;
@@ -158,6 +209,8 @@ static int consume_timestamp(struct cursor *cursor, struct ots_token *token) {
 
     consume_tag_or_attestation(cursor, tag, token);
 }
+
+#undef consume_tag
 
 static int parse_crypto_op(struct cursor *cursor, struct ots_token *token) {
     u8 *digest;
