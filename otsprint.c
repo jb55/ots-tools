@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <assert.h>
 #include "ots.h"
+#include "util.h"
 
 static FILE *encode_fd;
 #define UNUSED __attribute__((__unused__))
@@ -211,26 +212,6 @@ static void proof_cb(struct token *token) {
 	print_token(token);
 }
 
-
-static unsigned char *file_contents(const char *filename, size_t *length) {
-	FILE *f = fopen(filename, "rb");
-	u8 *buffer;
-
-	if (!f) {
-		fprintf(stderr, "Unable to open %s for reading\n", filename);
-		return NULL;
-	}
-
-	fseek(f, 0, SEEK_END);
-	*length = (size_t)ftell(f);
-	fseek(f, 0, SEEK_SET);
-
-	buffer = malloc(*length+1);
-	*length = fread(buffer, 1, *length, f);
-	fclose(f);
-
-	return buffer;
-}
 
 
 int main(int argc UNUSED, char *argv[])
