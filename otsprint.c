@@ -14,7 +14,6 @@ static FILE *encode_fd;
 #define MAX_TMPBUF_SIZE MAX_PAYLOAD_SIZE
 
 static char tmpbuf[MAX_TMPBUF_SIZE];
-typedef unsigned char u8;
 
 static inline u8 hexdigit( char hex ) {
 	return (hex <= '9') ? hex - '0' : toupper(hex) - 'A' + 10 ;
