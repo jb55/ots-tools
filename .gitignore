@@ -1,2 +1,3 @@
 /ots-encode
 /ots-encode.o
+*.o
