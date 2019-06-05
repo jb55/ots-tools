@@ -1,135 +1,107 @@
 
 #include <stdio.h>
 #include <stdbool.h>
+#include <string.h>
 
 #include "ots.h"
+#include "mini.h"
+#include "short_types.h"
+#include "base58.h"
 #include "util.h"
+#include "varint.h"
 
-enum minitypes {
-	MINI_FILEHASH = 0x00
-};
+#define streq(a, b) strcmp(a, b) == 0
 
-enum minitags {
-	MINI_OP_SHA1      = 0x01,
-	MINI_OP_RIPEMD160 = 0x02,
-	MINI_OP_SHA256    = 0x03,
-	MINI_OP_KECCAK256 = 0x04,
 
-	MINI_OP_APPEND    = 0x0A,
-	MINI_OP_PREPEND   = 0x0B,
-
-	MINI_OP_REVERSE   = 0x10,
-	MINI_OP_HEXLIFY   = 0x11,
-
-	MINI_ATT_PEND = 0x1A,
-	MINI_ATT_UNK  = 0x1B,
-	MINI_ATT_BTC  = 0x1C,
-	MINI_ATT_LTC  = 0x1D,
-
-};
+static void fail(int err, const char *msg)
+{
+	fprintf(stderr, "error: %s\n", msg);
+	exit(err);
+}
 
 static FILE *encode_fd;
-static const u8 succinct_proof_magic[] = { 0x6f, 0x74 };
 
-// These have a pretty basic encoding
-static u8 ots_mini_encode_op(const struct op *op)
+static void assertok(enum ots_parse_state res)
 {
-	switch (op->class) {
-	case OP_CLS_CRYPTO:
-		switch (op->crypto.op) {
-		case OP_SHA1:      return MINI_OP_SHA1;
-		case OP_RIPEMD160: return MINI_OP_RIPEMD160;
-		case OP_KECCAK256: return MINI_OP_KECCAK256;
-		case OP_SHA256:    return MINI_OP_SHA256;
-		}
-		break;
-	case OP_CLS_BINARY:
-		switch (op->binary.op) {
-		case OP_APPEND:  return MINI_OP_APPEND;
-		case OP_PREPEND: return MINI_OP_PREPEND;
-		}
-
-		break;
-	case OP_CLS_UNARY:
-		switch (op->unary_op) {
-		case OP_HEXLIFY: return MINI_OP_HEXLIFY;
-		case OP_REVERSE: return MINI_OP_REVERSE;
-		}
-		break;
+	if (res != OTS_PARSE_OK) {
+		printf("error: %s, %s\n", describe_parse_state(res),
+		       ots_errmsg);
+		exit(1);
 	}
-
-	return 0;
 }
 
-static u8 ots_mini_encode_attestation_tag(const struct attestation *a)
+void usage()
 {
-	switch (a->type) {
-	case ATTESTATION_BITCOIN_BLOCK_HEADER:  return MINI_ATT_BTC;
-	case ATTESTATION_LITECOIN_BLOCK_HEADER: return MINI_ATT_LTC;
-	case ATTESTATION_PENDING:               return MINI_ATT_PEND;
-	case ATTESTATION_UNKNOWN:               return MINI_ATT_UNK;
-	}
-
-	return MINI_ATT_UNK;
+	printf("usage: otsmini [--upgraded] <proof.ots>\n");
+	exit(1);
 }
-
-static void ots_mini_write_tag(u8 tag, bool *has_ts)
-{
-	if (*has_ts)
-		tag |= 0x80;
-	fwrite(&tag, 1, 1, encode_fd);
-	*has_ts = false;
-}
-
-static void ots_mini_encode(struct token *token)
-{
-	u8 tag;
-	static bool has_ts = false;
-
-	switch (token->type) {
-	case TOK_VERSION:
-		fwrite(succinct_proof_magic, sizeof(succinct_proof_magic), 1, encode_fd);
-		break;
-	case TOK_TIMESTAMP:
-		has_ts = true;
-		break;
-	case TOK_OP:
-		tag = ots_mini_encode_op(&token->data.op);
-		ots_mini_write_tag(tag, &has_ts);
-		break;
-	case TOK_ATTESTATION:
-		tag = ots_mini_encode_attestation_tag(&token->data.attestation);
-		ots_mini_write_tag(tag, &has_ts);
-		break;
-	case TOK_FILEHASH:
-		break;
-	}
-
-}
-
-/* static void ots_mini_decode(u8 *data, int data_len) */
-/* { */
-/* } */
-
 
 int main(int argc, char *argv[])
 {
-
 	size_t len = 0;
+	static u8 buf[32768];
+	char *filename = NULL;
 	enum ots_parse_state res;
 
-	if (argc != 2)
-		return 1;
+	struct token_search search = {
+		.done = false,
+		.att_token_start = -1,
+		.upgraded = false,
+		.tokindex = 0,
+	};
 
-	u8 *proof = file_contents(argv[1], &len);
-	encode_fd = stdout;
-	res = parse_ots_proof(proof, len, ots_mini_encode);
+	struct encoder encoder = {
+		.attest_loc = &search,
+		.has_ts = false,
+		.buf = buf,
+		.buflen = sizeof(buf),
+		.cursor = buf,
+	};
 
-	if (res != OTS_PARSE_OK) {
-		printf("error: %s, %s\n", describe_parse_state(res), ots_errmsg);
-		return 1;
+	if (argc < 2)
+		usage();
+
+	for (int i = 1; i < argc; i++) {
+		if (streq(argv[i], "--upgraded"))
+			search.upgraded = true;
+		else
+			filename = argv[i];
 	}
 
+	if (filename == NULL)
+		usage();
+
+	u8 *proof = file_contents(filename, &len);
+	encode_fd = stdout;
+
+	res = parse_ots_proof(proof, len, ots_mini_find, &search);
+	assertok(res);
+
+	if (!search.done) {
+		if (search.upgraded)
+			fail(2, "ots file is not an upgraded timestamp");
+		else
+			fail(2, "no non-upgraded attestation not found, try --upgraded");
+	}
+
+	search.tokindex = 0;
+	search.done = false;
+
+	res = parse_ots_proof(proof, len, ots_mini_encode, &encoder);
+	assertok(res);
+
+	char *out;
+	int ok =
+		wally_base58_from_bytes(encoder.buf,
+					encoder.cursor - encoder.buf,
+					0, &out);
+
+	if (ok != WALLY_OK)
+		fail(5, "base58 encode failed");
+
+	printf("%s\n", out);
+
+	free(out);
 	free(proof);
 
 	return 0;

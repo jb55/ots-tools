@@ -130,13 +130,15 @@ static void print_op(struct op *op) {
 
 	switch (op->class) {
 	case OP_CLS_CRYPTO:
-		if (op->crypto.data.sha1[0] != 0) {
-			encode_crypto_digest(op->crypto.op, op->crypto.data, tmpbuf, sizeof(tmpbuf));
+		if (op->crypto.datalen != 0) {
+			encode_crypto_digest(op->crypto.op,
+					     op->crypto.cryptodata,
+					     tmpbuf, sizeof(tmpbuf));
 			printf(" %s", tmpbuf);
 		}
 		break;
 	case OP_CLS_BINARY:
-		hex_encode(op->binary.data, op->binary.data_len, tmpbuf, sizeof(tmpbuf));
+		hex_encode(op->binary.bindata, op->binary.data_len, tmpbuf, sizeof(tmpbuf));
 		printf(" %s", tmpbuf);
 		break;
 	case OP_CLS_UNARY:
@@ -150,15 +152,15 @@ void print_attestation(struct attestation *attestation) {
 	printf("%s", name);
 	switch (attestation->type) {
 	case ATTESTATION_PENDING:
-		printf(" %.*s\n", attestation->payload.data_len,
-			   attestation->payload.data);
+		printf(" %.*s\n", attestation->data_len,
+			   attestation->data);
 		break;
 	case ATTESTATION_LITECOIN_BLOCK_HEADER:
 	case ATTESTATION_BITCOIN_BLOCK_HEADER:
 		printf(" height %d\n", attestation->height);
 		break;
 	case ATTESTATION_UNKNOWN:
-		hex_encode(attestation->payload.data, attestation->payload.data_len,
+		hex_encode(attestation->data, attestation->data_len,
 				   tmpbuf, MAX_TMPBUF_SIZE);
 		printf("unknown %s\n", tmpbuf);
 	}
@@ -183,7 +185,7 @@ static void print_token(struct token *token) {
 		printf("\n");
 		break;
 	case TOK_TIMESTAMP:
-		printf("  ");
+		printf("  ts ");
 		break;
 	}
 
@@ -203,10 +205,11 @@ int main(int argc UNUSED, char *argv[])
 	(void)proof_cb;
 	u8 *proof = file_contents(argv[1], &len);
 	encode_fd = stdout;
-	res = parse_ots_proof(proof, len, proof_cb);
+	res = parse_ots_proof(proof, len, proof_cb, NULL);
 
 	if (res != OTS_PARSE_OK) {
-		printf("error: %s, %s\n", describe_parse_state(res), ots_errmsg);
+		printf("error: %s, %s\n", describe_parse_state(res),
+		       ots_errmsg);
 		return 1;
 	}
 

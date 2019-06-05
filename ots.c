@@ -148,6 +148,19 @@ static int parse_op_class(u8 type, enum op_class *class)
 	return 0;
 }
 
+int ots_cryptodata_size(struct crypto *crypto) {
+	switch (crypto->op) {
+	case OP_RIPEMD160:
+	case OP_SHA1:
+		return 20;
+	case OP_SHA256:
+	case OP_KECCAK256:
+		return 32;
+	}
+
+	return 20;
+}
+
 static int parse_crypto_op_payload(struct cursor *cursor, struct op *op)
 {
 	u8 *digest;
@@ -157,9 +170,10 @@ static int parse_crypto_op_payload(struct cursor *cursor, struct op *op)
 	digest = cursor->p;
 
 #define consume_hash(typ)					\
-	digest_len = sizeof(op->crypto.data.typ);		 \
+	digest_len = sizeof(op->crypto.cryptodata.typ);		 \
 	if (!consume_bytes(cursor, NULL, digest_len)) return 0;	\
-	memcpy(op->crypto.data.typ, digest, digest_len); \
+	memcpy(op->crypto.cryptodata.typ, digest, digest_len); \
+	op->crypto.datalen = digest_len; \
 	return 1
 
 	switch (op->crypto.op) {
@@ -257,7 +271,7 @@ static int parse_binary_op_payload(struct cursor *cursor, struct op *op) {
 
 	return consume_varbytes(cursor, MAX_RESULT_LENGTH, min_len,
 				&op->binary.data_len,
-				&op->binary.data);
+				&op->binary.bindata);
 }
 
 static int consume_op(struct cursor *cursor, u8 tag, struct op *op) {
@@ -270,7 +284,7 @@ static int consume_op(struct cursor *cursor, u8 tag, struct op *op) {
 	switch (op->class) {
 	case OP_CLS_CRYPTO:
 		op->crypto.op = tag;
-		op->crypto.data.sha1[0] = 0;
+		op->crypto.datalen = 0;
 		return 1;
 	/* return parse_crypto_op_payload(cursor, op); */
 	case OP_CLS_BINARY:
@@ -306,23 +320,25 @@ static int consume_attestation(struct cursor *cursor,
 
 	int len;
 	consume_varint(cursor, MAX_PAYLOAD_SIZE, &len);
+	attestation->data_len = len;
 
 	switch (attestation->type) {
 	case ATTESTATION_PENDING:
 		if (!consume_varbytes(cursor, MAX_PAYLOAD_SIZE-1, 1,
-					&attestation->payload.data_len,
-					&attestation->payload.data))
+					&attestation->data_len,
+					&attestation->data))
 			return 0;
 		break;
 	case ATTESTATION_UNKNOWN:
-		attestation->payload.data = cursor->p;
-		attestation->payload.data_len = len;
+		attestation->data = cursor->p;
 		consume_bytes(cursor, NULL, len);
 	break;
 	case ATTESTATION_LITECOIN_BLOCK_HEADER:
 	case ATTESTATION_BITCOIN_BLOCK_HEADER:
-		if (!consume_varint(cursor, INT_MAX, &attestation->height))
+		if (!consume_varint(cursor, INT_MAX,
+				    &attestation->height))
 			return 0;
+		attestation->data = (unsigned char*)&attestation->height;
 		break;
 	}
 
@@ -391,8 +407,10 @@ static int consume_magic(struct cursor *cursor) {
 	return consume_bytes(cursor, proof_magic, sizeof(proof_magic));
 }
 
-static int consume_header(struct cursor *cursor, ots_token_cb *cb) {
-	struct token tok;
+static int consume_header(struct cursor *cursor, ots_token_cb *cb,
+			  void *user_data)
+{
+	struct token tok = { .user_data = user_data };
 	int ok = 0;
 	u8 version;
 
@@ -421,8 +439,10 @@ static int consume_crypto_op(struct cursor *cursor, struct token *token) {
 	return 1;
 }
 
-enum ots_parse_state parse_ots_proof(u8 *buf, int len, ots_token_cb *cb) {
-	struct token token;
+enum ots_parse_state parse_ots_proof(u8 *buf, int len, ots_token_cb *cb,
+				     void *user_data)
+{
+	struct token token = { .user_data = user_data };
 	struct cursor cursor_data;
 	struct cursor *cursor = &cursor_data;
 	init_cursor(cursor);
@@ -430,7 +450,7 @@ enum ots_parse_state parse_ots_proof(u8 *buf, int len, ots_token_cb *cb) {
 	cursor->p   = buf;
 	cursor->end = buf + len;
 
-	if (!consume_header(cursor, cb))
+	if (!consume_header(cursor, cb, user_data))
 	return cursor->state;
 
 	token.type = TOK_FILEHASH;
