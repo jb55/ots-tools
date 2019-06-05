@@ -125,24 +125,6 @@ static char *attestation_type_name(enum attestation_type type) {
 	return "impossible";
 }
 
-static void proof_encode(struct token *token) {
-	switch (token->type) {
-	case TOK_VERSION:
-		fwrite(succinct_proof_magic, sizeof(succinct_proof_magic), 1, encode_fd);
-		break;
-	case TOK_TIMESTAMP:
-		fwrite("\x0", 1, 1, encode_fd);
-		break;
-	case TOK_OP:
-		break;
-	case TOK_ATTESTATION:
-		break;
-	case TOK_FILEHASH:
-		break;
-	}
-
-}
-
 static void print_op(struct op *op) {
 	printf("%s", op_tag_str(op->class, op));
 
@@ -219,7 +201,6 @@ int main(int argc UNUSED, char *argv[])
 	enum ots_parse_state res;
 
 	(void)proof_cb;
-	(void)proof_encode;
 	u8 *proof = file_contents(argv[1], &len);
 	encode_fd = stdout;
 	res = parse_ots_proof(proof, len, proof_cb);
