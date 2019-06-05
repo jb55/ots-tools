@@ -91,8 +91,6 @@ struct token {
     } data;
 };
 
-extern const unsigned char succinct_proof_magic[3];
-
 typedef void (ots_token_cb)(struct token *tok);
 
 const char *describe_parse_state(enum ots_parse_state state);
