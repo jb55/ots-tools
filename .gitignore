@@ -2,3 +2,5 @@
 /ots-encode.o
 *.o
 /otsprint
+/otsmini
+/TAGS
