@@ -427,7 +427,7 @@ enum ots_parse_state parse_ots_proof(u8 *buf, int len, ots_token_cb *cb) {
 	struct cursor *cursor = &cursor_data;
 	init_cursor(cursor);
 
-	cursor->p	= buf;
+	cursor->p   = buf;
 	cursor->end = buf + len;
 
 	if (!consume_header(cursor, cb))
