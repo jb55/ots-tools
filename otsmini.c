@@ -54,6 +54,7 @@ int main(int argc, char *argv[])
 
 	struct encoder encoder = {
 		.attest_loc = &search,
+		.strip_filehash = false,
 		.has_ts = false,
 		.buf = buf,
 		.buflen = sizeof(buf),
@@ -66,6 +67,8 @@ int main(int argc, char *argv[])
 	for (int i = 1; i < argc; i++) {
 		if (streq(argv[i], "--upgraded"))
 			search.upgraded = true;
+		else if (streq(argv[i], "--no-filehash"))
+			encoder.strip_filehash = true;
 		else
 			filename = argv[i];
 	}

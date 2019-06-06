@@ -33,6 +33,7 @@ struct token_search {
 
 struct encoder {
 	struct token_search *attest_loc;
+	bool strip_filehash;
 	bool has_ts;
 	unsigned char *buf;
 	int buflen;

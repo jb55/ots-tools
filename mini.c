@@ -177,7 +177,7 @@ void ots_mini_encode(struct token *token)
 	int *tokindex = &e->attest_loc->tokindex;
 	int data_len;
 
-	u8 tag;
+	u8 tag, ver;
 	struct op *op;
 
 	if (e->attest_loc->done)
@@ -185,15 +185,25 @@ void ots_mini_encode(struct token *token)
 
 	// >1 because we always need version and first crypto op
 	// otherwise skip until we hit the first non-remote attestation
-	if (*tokindex > 1 && *tokindex < e->attest_loc->att_token_start_candidate) {
+
+	// 3 = VERSION, FILEHASH, FIRST CRYPTO OP
+	// TODO: this is a bit brittle if the format ever changes
+	// TODO: we could leave off file_hash for really small timestamps?
+
+	int skip = e->strip_filehash? 2 : 3;
+
+	if (*tokindex >= skip && *tokindex < e->attest_loc->att_token_start_candidate) {
 		(*tokindex)++;
 		return;
 	}
 
 	switch (token->type) {
 	case TOK_VERSION:
+		ver = token->data.version;
+		if (e->strip_filehash)
+			ver |= 0x80;
 		writebuf(e, ots_mini_magic, sizeof(ots_mini_magic));
-		writebuf(e, &token->data.version, 1);
+		writebuf(e, &ver, 1);
 		break;
 	case TOK_TIMESTAMP:
 		e->has_ts = true;
@@ -207,9 +217,11 @@ void ots_mini_encode(struct token *token)
 			writebuf(e, op->binary.bindata, op->binary.data_len);
 			break;
 		case OP_CLS_CRYPTO:
-			if (op->crypto.datalen != 0)
+			if (op->crypto.datalen != 0) {
+				debug("writing file hash\n");
 				writebuf(e, op->crypto.cryptodata.sha1,
-				       op->crypto.datalen);
+					 op->crypto.datalen);
+			}
 			break;
 		case OP_CLS_UNARY:
 			break;
@@ -230,6 +242,7 @@ void ots_mini_encode(struct token *token)
 		break;
 	case TOK_FILEHASH:
 		break;
+
 	}
 
 	(*tokindex)++;
