@@ -46,6 +46,8 @@ int main(int argc, char *argv[])
 	struct token_search search = {
 		.done = false,
 		.att_token_start = -1,
+		.att_candidate_payload_size = 0,
+		.att_payload_size = 0,
 		.upgraded = false,
 		.tokindex = 0,
 	};
@@ -76,6 +78,8 @@ int main(int argc, char *argv[])
 
 	res = parse_ots_proof(proof, len, ots_mini_find, &search);
 	assertok(res);
+
+	search.done = search.done || search.att_token_start_candidate != 0;
 
 	if (!search.done) {
 		if (search.upgraded)

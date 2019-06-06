@@ -25,6 +25,9 @@ struct token_search {
 	bool done;
 	bool upgraded;
 	int tokindex;
+	int att_token_start_candidate;
+	int att_candidate_payload_size;
+	int att_payload_size;
 	int att_token_start;
 };
 

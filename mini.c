@@ -8,9 +8,6 @@
 #include "util.h"
 #include "varint.h"
 
-/* #define debug(...) fprintf(stderr, __VA_ARGS__) */
-#define debug(...)
-
 static void fail(int err, const char *msg)
 {
 	fprintf(stderr, "error: %s\n", msg);
@@ -85,20 +82,17 @@ static void writebuf_varint(struct encoder *encoder, uint64_t n)
 
 static int ots_mini_write_tag(struct encoder *e, u8 tag)
 {
-	if (e->has_ts)
+	if (e->has_ts) {
 		tag |= 0x80;
-
-	if (tag & 0x80) {
-		debug("ts ");
 	}
 
-	debug("%02hhX\n", tag & ~0x80);
 	writebuf(e, &tag, 1);
 	e->has_ts = false;
 
 	return 1;
 }
 
+// find the smallest attestation
 void ots_mini_find(struct token *token)
 {
 	enum attestation_type typ;
@@ -111,20 +105,57 @@ void ots_mini_find(struct token *token)
 	switch (token->type) {
 	case TOK_ATTESTATION:
 		typ = token->data.attestation.type;
-		if ((search->upgraded && typ != ATTESTATION_PENDING) ||
-		   (!search->upgraded && typ == ATTESTATION_PENDING)) {
+
+		if (search->upgraded && typ != ATTESTATION_PENDING) {
+			// finish right away if we're looking for
+			// an upgraded proof
+			// TODO: find smallest of multiple upgraded proofs?
+			// the only way this could happen is if we're
+			// committing to multiple blockchains
+
+			search->att_token_start_candidate =
+				search->att_token_start;
 			search->done = true;
+			return;
 		}
-		else {
-			search->att_token_start = search->tokindex+1;
+
+		search->att_payload_size +=
+			token->data.attestation.data_len;
+
+		// we found a smaller attestation
+		if (search->att_candidate_payload_size == 0 ||
+		    search->att_payload_size <
+		    search->att_candidate_payload_size)
+		{
+			debug("using payload %d, prev candidate %d\n",
+			      search->att_payload_size,
+			      search->att_candidate_payload_size);
+
+			search->att_candidate_payload_size =
+				search->att_payload_size;
+
+			search->att_token_start_candidate =
+				search->att_token_start;
 		}
+
+		search->att_token_start =
+			search->tokindex+1;
+
+		search->att_payload_size = 0;
 		break;
 
 	case TOK_OP:
+		// very start of the file
 		if (token->data.op.class == OP_CLS_CRYPTO &&
 		    token->data.op.crypto.datalen != 0)
 		{
 			search->att_token_start = search->tokindex+1;
+			search->att_payload_size = 0;
+		}
+		else if (token->data.op.class == OP_CLS_BINARY)
+		{
+			search->att_payload_size +=
+				token->data.op.binary.data_len;
 		}
 		break;
 
@@ -132,6 +163,10 @@ void ots_mini_find(struct token *token)
 		break;
 
 	}
+
+	// ops are 1 byte, but TS's are discounted due to our encoding
+	if (token->type != TOK_TIMESTAMP)
+		search->att_payload_size++;
 
 	search->tokindex++;
 }
@@ -150,7 +185,7 @@ void ots_mini_encode(struct token *token)
 
 	// >1 because we always need version and first crypto op
 	// otherwise skip until we hit the first non-remote attestation
-	if (*tokindex > 1 && *tokindex < e->attest_loc->att_token_start) {
+	if (*tokindex > 1 && *tokindex < e->attest_loc->att_token_start_candidate) {
 		(*tokindex)++;
 		return;
 	}
