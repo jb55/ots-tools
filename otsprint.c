@@ -200,16 +200,16 @@ static void proof_cb(struct token *token) {
 int main(int argc UNUSED, char *argv[])
 {
 	size_t len = 0;
-	enum ots_parse_state res;
+	enum decoder_state res;
 
 	(void)proof_cb;
 	u8 *proof = file_contents(argv[1], &len);
 	encode_fd = stdout;
 	res = parse_ots_proof(proof, len, proof_cb, NULL);
 
-	if (res != OTS_PARSE_OK) {
+	if (res != DECODER_PARSE_OK) {
 		printf("error: %s, %s\n", describe_parse_state(res),
-		       ots_errmsg);
+		       decoder_errmsg);
 		return 1;
 	}
 

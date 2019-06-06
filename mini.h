@@ -3,22 +3,57 @@
 #define OTS_MINI_H
 
 #include <stdbool.h>
+#include "ots.h"
 
-enum minitag {
-	MINI_OP_SHA1      = 0x01,
-	MINI_OP_RIPEMD160 = 0x02,
-	MINI_OP_SHA256    = 0x03,
-	MINI_OP_KECCAK256 = 0x04,
-	MINI_OP_APPEND    = 0x0A,
-	MINI_OP_PREPEND   = 0x0B,
-
-	MINI_OP_REVERSE   = 0x10,
-	MINI_OP_HEXLIFY   = 0x11,
-
+enum mini_attestation {
 	MINI_ATT_PEND = 0x1A,
 	MINI_ATT_UNK  = 0x1B,
 	MINI_ATT_BTC  = 0x1C,
 	MINI_ATT_LTC  = 0x1D,
+};
+
+
+enum mini_crypto_op
+{
+	MINI_OP_SHA1      = 0x01,
+	MINI_OP_RIPEMD160 = 0x02,
+	MINI_OP_SHA256    = 0x03,
+	MINI_OP_KECCAK256 = 0x04,
+};
+
+
+enum mini_binary_op
+{
+	MINI_OP_APPEND    = 0x0A,
+	MINI_OP_PREPEND   = 0x0B,
+};
+
+
+enum mini_unary_op
+{
+	MINI_OP_REVERSE   = 0x10,
+	MINI_OP_HEXLIFY   = 0x11,
+};
+
+
+struct mini_crypto {
+	int datalen;
+	enum mini_crypto_op op;
+	union crypto_data cryptodata;
+};
+
+
+struct mini_op {
+	enum op_class class;
+	union {
+		struct mini_crypto crypto;
+		struct {
+			enum mini_binary_op op;
+			unsigned char *bindata;
+			int data_len;
+		} binary;
+		enum mini_unary_op unary_op;
+	};
 };
 
 struct token_search {
@@ -39,6 +74,18 @@ struct encoder {
 	int buflen;
 	unsigned char *cursor;
 };
+
+struct mini_token {
+	void *user_data;
+	enum token_type type;
+	union {
+		unsigned char version;
+		struct mini_op op;
+		struct attestation attestation;
+	} data;
+};
+
+typedef void (mini_ots_token_cb)(struct mini_token *tok);
 
 void ots_mini_find(struct token *token);
 void ots_mini_encode(struct token *token);

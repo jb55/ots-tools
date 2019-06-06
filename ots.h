@@ -2,13 +2,15 @@
 #ifndef OTS_H
 #define OTS_H
 
-enum ots_parse_state {
-	OTS_PARSE_OK,
-	OTS_PARSE_PARTIAL,
-	OTS_ERR_OVERFLOW,
-	OTS_ERR_CORRUPT,
-	OTS_ERR_UNSUPPORTED_VERSION,
-};
+#include <string.h>
+#include "decoder.h"
+
+#define ATTESTATION_TAG_SIZE 8
+#define MAX_RESULT_LENGTH 4096
+#define MAX_PAYLOAD_SIZE 8192
+
+#define memeq(d, d2, len) (memcmp(d, d2, len) == 0)
+#define attestation_eq(a1, a2) memeq(a1, a2, ATTESTATION_TAG_SIZE)
 
 enum attestation_type {
 	ATTESTATION_PENDING,
@@ -81,6 +83,7 @@ struct attestation {
 	int data_len;
 };
 
+
 struct token {
 	void *user_data;
 	enum token_type type;
@@ -91,12 +94,18 @@ struct token {
 	} data;
 };
 
+
+extern const u8 pending_attestation[ATTESTATION_TAG_SIZE];
+extern const u8 bitcoin_block_header_attestation[ATTESTATION_TAG_SIZE];
+extern const u8 litecoin_block_header_attestation[ATTESTATION_TAG_SIZE];
+
+
 typedef void (ots_token_cb)(struct token *tok);
 
-const char *describe_parse_state(enum ots_parse_state state);
+const char *describe_parse_state(enum decoder_state state);
 
-enum ots_parse_state parse_ots_proof(unsigned char *buf, int len,
-				     ots_token_cb *cb, void *user_data);
+enum decoder_state parse_ots_proof(unsigned char *buf, int len,
+				   ots_token_cb *cb, void *user_data);
 
 extern char *ots_errmsg;
 

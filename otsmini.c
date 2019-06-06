@@ -21,11 +21,11 @@ static void fail(int err, const char *msg)
 
 static FILE *encode_fd;
 
-static void assertok(enum ots_parse_state res)
+static void assertok(enum decoder_state res)
 {
-	if (res != OTS_PARSE_OK) {
+	if (res != DECODER_PARSE_OK) {
 		printf("error: %s, %s\n", describe_parse_state(res),
-		       ots_errmsg);
+		       decoder_errmsg);
 		exit(1);
 	}
 }
@@ -41,7 +41,7 @@ int main(int argc, char *argv[])
 	size_t len = 0;
 	static u8 buf[32768];
 	char *filename = NULL;
-	enum ots_parse_state res;
+	enum decoder_state res;
 
 	struct token_search search = {
 		.done = false,

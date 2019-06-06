@@ -7,8 +7,8 @@
 #include <limits.h>
 
 #include "ots.h"
+#include "decoder.h"
 
-#define ATTESTATION_TAG_SIZE 8
 #define STR_DETAIL(x) #x
 #define STR(x) STR_DETAIL(x)
 typedef unsigned char u8;
@@ -22,31 +22,8 @@ typedef unsigned char u8;
 #define MAX_FILE_DIGEST_LENGTH 32
 
 // maximum size of attestation payload
-#define MAX_PAYLOAD_SIZE 8192
-#define MAX_RESULT_LENGTH 4096
 #define MAX_TMPBUF_SIZE MAX_PAYLOAD_SIZE
 
-#define memeq(d, d2, len) (memcmp(d, d2, len) == 0)
-
-#define attestation_eq(a1, a2) memeq(a1, a2, ATTESTATION_TAG_SIZE)
-
-#define peek_cursor(len) (cursor->p + (len) > cursor->end)
-
-#define check_cursor(len)				\
-	do {						\
-	if (peek_cursor(len)) {	   \
-		ots_errmsg = (char*)__PRETTY_FUNCTION__;	\
-		cursor->state = OTS_ERR_OVERFLOW;		\
-		return 0;					\
-	}						\
-	} while(0)
-
-
-struct cursor {
-	u8 *p;
-	u8 *end;
-	enum ots_parse_state state;
-};
 
 // ots
 const u8 succinct_proof_magic[] = { 0x6f, 0x74, 0x73 };
@@ -58,54 +35,19 @@ static const u8 proof_magic[] = {
 	0x89, 0xe2, 0xe8, 0x84, 0xe8, 0x92, 0x94
 };
 
-static const u8 pending_attestation[ATTESTATION_TAG_SIZE] = {
+const u8 pending_attestation[ATTESTATION_TAG_SIZE] = {
 	0x83, 0xdf, 0xe3, 0x0d, 0x2e, 0xf9, 0x0c, 0x8e
 };
 
-static const u8 bitcoin_block_header_attestation[ATTESTATION_TAG_SIZE] = {
+const u8 bitcoin_block_header_attestation[ATTESTATION_TAG_SIZE] = {
 	0x05, 0x88, 0x96, 0x0d, 0x73, 0xd7, 0x19, 0x01
 };
 
-static const u8 litecoin_block_header_attestation[ATTESTATION_TAG_SIZE] = {
+const u8 litecoin_block_header_attestation[ATTESTATION_TAG_SIZE] = {
 	0x06, 0x86, 0x9a, 0x0d, 0x73, 0xd7, 0x1b, 0x45
 };
 
 
-char *ots_errmsg = "no additional information";
-
-static void init_cursor(struct cursor *cursor) {
-	cursor->state = OTS_PARSE_PARTIAL;
-	cursor->p = NULL;
-	cursor->end = NULL;
-};
-
-static int consume_bytes(struct cursor *cursor, const u8 *bytes,
-			 unsigned int bytes_len) {
-	// this should only trigger if we've missed a check_cursor up above
-	// this doesn't provide useful error messages if we hit it here.
-	check_cursor(bytes_len);
-
-	if (bytes == NULL || memcmp(cursor->p, bytes, bytes_len) == 0)
-		cursor->p += bytes_len;
-	else
-		return 0;
-
-	return 1;
-}
-
-
-static int consume_matching_byte(struct cursor *cursor, const u8 byte) {
-	u8 bytes[] = { byte };
-	return consume_bytes(cursor, bytes, sizeof(bytes));
-}
-
-static int consume_byte(struct cursor *cursor, u8 *byte) {
-	if (!consume_bytes(cursor, NULL, 1))
-		return 0;
-	if (byte)
-		*byte = *(cursor->p - 1);
-	return 1;
-}
 
 // NOTE: this is technically a varuint
 static int consume_version(struct cursor *cursor, u8 *ver) {
@@ -114,7 +56,7 @@ static int consume_version(struct cursor *cursor, u8 *ver) {
 	*ver = *cursor->p;
 	ok = consume_matching_byte(cursor, SUPPORTED_VERSION);
 	if (!ok) {
-		cursor->state = OTS_ERR_UNSUPPORTED_VERSION;
+		cursor->state = DECODER_ERR_UNSUPPORTED_VERSION;
 		return 0;
 	}
 	return ok;
@@ -199,14 +141,14 @@ static int parse_crypto_op(struct cursor *cursor, struct op *op)
 		return 0;
 
 	if (!parse_op_class(tag, &op->class)) {
-		ots_errmsg = "could not parse op class";
-		cursor->state = OTS_ERR_CORRUPT;
+		decoder_errmsg = "could not parse op class";
+		cursor->state = DECODER_ERR_CORRUPT;
 		return 0;
 	}
 
 	if (op->class != OP_CLS_CRYPTO) {
-		ots_errmsg = "tried to parse crypto op, but is not crypto op class";
-		cursor->state = OTS_ERR_CORRUPT;
+		decoder_errmsg = "tried to parse crypto op, but is not crypto op class";
+		cursor->state = DECODER_ERR_CORRUPT;
 		return 0;
 	}
 
@@ -215,55 +157,6 @@ static int parse_crypto_op(struct cursor *cursor, struct op *op)
 	return parse_crypto_op_payload(cursor, op);
 }
 
-static int consume_varint(struct cursor *cursor, int max_len,
-			  int *res) {
-	int shift = 0;
-	*res = 0;
-	u8 byte;
-
-	while (1) {
-		if (!consume_byte(cursor, &byte))
-			return 0;
-
-		*res |= (byte & 127) << shift;
-
-		if (*res > max_len) {
-			ots_errmsg = "varint larger than max_len";
-			return 0;
-		}
-
-		if (!(byte & 128))
-			break;
-
-		shift += 7;
-	}
-
-	return 1;
-}
-
-
-static int consume_varbytes(struct cursor *cursor, int max_len,
-				int min_len, int *len, u8 **data) {
-	if (!consume_varint(cursor, max_len, len)) {
-		cursor->state = OTS_ERR_CORRUPT;
-		return 0;
-	}
-
-	if (*len > max_len) {
-		ots_errmsg = "consume_varbytes: payload too large";
-		cursor->state = OTS_ERR_CORRUPT;
-		return 0;
-	}
-
-	if (*len < min_len) {
-		cursor->state = OTS_ERR_CORRUPT;
-		ots_errmsg = "consume_varbytes: payload too small";
-		return 0;
-	}
-
-	*data = cursor->p;
-	return consume_bytes(cursor, NULL, *len);
-}
 
 static int parse_binary_op_payload(struct cursor *cursor, struct op *op) {
 	static const unsigned int min_len = 1;
@@ -274,10 +167,11 @@ static int parse_binary_op_payload(struct cursor *cursor, struct op *op) {
 				&op->binary.bindata);
 }
 
+
 static int consume_op(struct cursor *cursor, u8 tag, struct op *op) {
 	if (!parse_op_class(tag, &op->class)) {
-		ots_errmsg = "could not parse OP class";
-		cursor->state = OTS_ERR_CORRUPT;
+		decoder_errmsg = "could not parse OP class";
+		cursor->state = DECODER_ERR_CORRUPT;
 		return 0;
 	}
 
@@ -310,8 +204,9 @@ static enum attestation_type parse_attestation_type(u8 *data) {
 	return ATTESTATION_UNKNOWN;
 }
 
-static int consume_attestation(struct cursor *cursor,
-				   struct attestation *attestation) {
+int consume_attestation(struct cursor *cursor,
+			struct attestation *attestation)
+{
 	u8 *tag = cursor->p;
 	if (!consume_bytes(cursor, NULL, ATTESTATION_TAG_SIZE))
 		return 0;
@@ -345,6 +240,8 @@ static int consume_attestation(struct cursor *cursor,
 	return 1;
 }
 
+#define consume_tag(tag)				\
+	if (!consume_byte(cursor, &tag)) return 0
 
 static int consume_timestamp(struct cursor *cursor, struct token *token,
 				 ots_token_cb *cb);
@@ -369,8 +266,6 @@ static int consume_tag_or_attestation(struct cursor *cursor, u8 tag,
 	return 1;
 }
 
-#define consume_tag(tag) \
-	if (!consume_byte(cursor, &tag)) return 0
 
 static int consume_timestamp(struct cursor *cursor, struct token *token,
 			     ots_token_cb *cb)
@@ -392,7 +287,7 @@ static int consume_timestamp(struct cursor *cursor, struct token *token,
 	}
 
 	if (!consume_tag_or_attestation(cursor, tag, token, cb)) {
-		ots_errmsg = "failed to consume final timestamp tag or attestation";
+		decoder_errmsg = "failed to consume final timestamp tag or attestation";
 		return 0;
 	}
 
@@ -429,8 +324,8 @@ static int consume_header(struct cursor *cursor, ots_token_cb *cb,
 
 static int consume_crypto_op(struct cursor *cursor, struct token *token) {
 	if (!parse_crypto_op(cursor, &token->data.op)) {
-		cursor->state = OTS_ERR_CORRUPT;
-		ots_errmsg = "expected file hash";
+		cursor->state = DECODER_ERR_CORRUPT;
+		decoder_errmsg = "expected file hash";
 		return 0;
 	}
 
@@ -439,7 +334,7 @@ static int consume_crypto_op(struct cursor *cursor, struct token *token) {
 	return 1;
 }
 
-enum ots_parse_state parse_ots_proof(u8 *buf, int len, ots_token_cb *cb,
+enum decoder_state parse_ots_proof(u8 *buf, int len, ots_token_cb *cb,
 				     void *user_data)
 {
 	struct token token = { .user_data = user_data };
@@ -464,21 +359,8 @@ enum ots_parse_state parse_ots_proof(u8 *buf, int len, ots_token_cb *cb,
 	if (!consume_timestamp(cursor, &token, cb))
 	return cursor->state;
 
-	cursor->state = OTS_PARSE_OK;
+	cursor->state = DECODER_PARSE_OK;
 	return cursor->state;
 }
 
 
-const char *describe_parse_state(enum ots_parse_state state) {
-	switch (state) {
-	case OTS_PARSE_OK: return "success";
-	case OTS_PARSE_PARTIAL: return "incomplete";
-	case OTS_ERR_OVERFLOW: return "overflow";
-	case OTS_ERR_CORRUPT: return "corrupt";
-	case OTS_ERR_UNSUPPORTED_VERSION: return "unsupported version";
-	}
-
-	assert(!"unhandled parse_state");
-
-	return "unknown";
-}

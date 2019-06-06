@@ -7,6 +7,7 @@ OBJS+=varint.o
 OBJS+=mini.o
 OBJS+=base58.o
 OBJS+=compiler.o
+OBJS+=decoder.o
 
 all: otsprint otsmini
 
