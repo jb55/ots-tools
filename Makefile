@@ -6,7 +6,6 @@ OBJS+=util.o
 OBJS+=varint.o
 OBJS+=mini.o
 OBJS+=base58.o
-OBJS+=sha256.o
 OBJS+=compiler.o
 
 all: otsprint otsmini

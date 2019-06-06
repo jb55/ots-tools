@@ -1,7 +1,6 @@
 
 
 #include "base58.h"
-#include "sha256.h"
 #include "endian.h"
 #include "short_types.h"
 #include "compiler.h"
@@ -153,22 +152,22 @@ cleanup:
     return ret;
 }
 
-uint32_t base58_get_checksum(const unsigned char *bytes, size_t bytes_len)
-{
-    struct sha256 sha;
-    uint32_t checksum;
+/* uint32_t base58_get_checksum(const unsigned char *bytes, size_t bytes_len) */
+/* { */
+/*     struct sha256 sha; */
+/*     uint32_t checksum; */
 
-    sha256d(bytes, bytes_len, (unsigned char *)&sha, sizeof(sha));
-    checksum = sha.u.u32[0];
-    wally_clear(&sha, sizeof(sha));
-    return checksum;
-}
+/*     sha256d(bytes, bytes_len, (unsigned char *)&sha, sizeof(sha)); */
+/*     checksum = sha.u.u32[0]; */
+/*     wally_clear(&sha, sizeof(sha)); */
+/*     return checksum; */
+/* } */
 
 
 int wally_base58_from_bytes(const unsigned char *bytes, size_t bytes_len,
                             uint32_t flags, char **output)
 {
-    uint32_t checksum, *cs_p = NULL;
+    uint32_t *cs_p = NULL;
     unsigned char bn_buf[BIGNUM_BYTES];
     unsigned char *bn = bn_buf, *top_byte, *bn_p;
     size_t bn_bytes = 0, zeros, i, orig_len = bytes_len;
@@ -180,11 +179,11 @@ int wally_base58_from_bytes(const unsigned char *bytes, size_t bytes_len,
     if (!bytes || !bytes_len || (flags & ~BASE58_ALL_DEFINED_FLAGS) || !output)
         goto cleanup; /* Invalid argument */
 
-    if (flags & BASE58_FLAG_CHECKSUM) {
-        checksum = base58_get_checksum(bytes, bytes_len);
-        cs_p = &checksum;
-        bytes_len += 4;
-    }
+    /* if (flags & BASE58_FLAG_CHECKSUM) { */
+    /*     checksum = base58_get_checksum(bytes, bytes_len); */
+    /*     cs_p = &checksum; */
+    /*     bytes_len += 4; */
+    /* } */
 
 #define b(n) (n < orig_len ? bytes[n] : ((unsigned char *)cs_p)[n - orig_len])
 
@@ -262,8 +261,8 @@ int wally_base58_to_bytes(const char *str_in, uint32_t flags,
                           unsigned char *bytes_out, size_t len,
                           size_t *written)
 {
-    size_t offset;
-    uint32_t checksum;
+    /* size_t offset; */
+    /* uint32_t checksum; */
     int ret;
 
     if (written)
@@ -281,22 +280,22 @@ int wally_base58_to_bytes(const char *str_in, uint32_t flags,
     if (!ret && *written > len)
         return WALLY_OK; /* not enough space, return required amount */
 
-    if (!ret && (flags & BASE58_FLAG_CHECKSUM)) {
-        if (*written <= BASE58_CHECKSUM_LEN) {
-            wally_clear(bytes_out, len);
-            return WALLY_EINVAL; /* Input not long enough to contain a checksum */
-        }
+    /* if (!ret && (flags & BASE58_FLAG_CHECKSUM)) { */
+    /*     if (*written <= BASE58_CHECKSUM_LEN) { */
+    /*         wally_clear(bytes_out, len); */
+    /*         return WALLY_EINVAL; /\* Input not long enough to contain a checksum *\/ */
+    /*     } */
 
-        offset = *written - BASE58_CHECKSUM_LEN;
-        checksum = base58_get_checksum(bytes_out, offset);
+    /*     offset = *written - BASE58_CHECKSUM_LEN; */
+    /*     checksum = base58_get_checksum(bytes_out, offset); */
 
-        if (memcmp(bytes_out + offset, &checksum, sizeof(checksum))) {
-            wally_clear(bytes_out, len);
-            return WALLY_EINVAL; /* Checksum mismatch */
-        }
+    /*     if (memcmp(bytes_out + offset, &checksum, sizeof(checksum))) { */
+    /*         wally_clear(bytes_out, len); */
+    /*         return WALLY_EINVAL; /\* Checksum mismatch *\/ */
+    /*     } */
 
-        wally_clear(bytes_out + offset, BASE58_CHECKSUM_LEN);
-        *written -= BASE58_CHECKSUM_LEN;
-    }
+    /*     wally_clear(bytes_out + offset, BASE58_CHECKSUM_LEN); */
+    /*     *written -= BASE58_CHECKSUM_LEN; */
+    /* } */
     return ret;
 }
