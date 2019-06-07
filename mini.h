@@ -99,7 +99,10 @@ struct mini_options {
 
 typedef void (mini_ots_token_cb)(struct mini_token *tok);
 
-enum mini_res ots_mini_encode(struct mini_options *opts, u8 *proof, int prooflen,
+enum decoder_state parse_ots_mini(u8 *buf, int len, mini_ots_token_cb *cb,
+				  void *user_data);
+
+enum mini_res encode_ots_mini(struct mini_options *opts, u8 *proof, int prooflen,
 			      u8 *buf, int bufsize, int *outlen);
 
 extern const unsigned char ots_mini_magic[3];

@@ -594,7 +594,7 @@ void ots_mini_encode_fn(struct token *token)
 }
 
 
-enum mini_res ots_mini_encode(struct mini_options *opts, u8 *proof, int prooflen,
+enum mini_res encode_ots_mini(struct mini_options *opts, u8 *proof, int prooflen,
 			      u8 *buf, int bufsize, int *outlen)
 {
 	enum decoder_state res;

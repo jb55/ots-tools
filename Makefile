@@ -17,6 +17,12 @@ otsprint: otsprint.c $(OBJS)
 otsmini: otsmini.c $(OBJS)
 	$(CC) $(CFLAGS) $^ -o $@
 
+run-tests: test.c $(OBJS)
+	$(CC) $(CFLAGS) $^ -o $@
+
+check: run-tests fake
+	./run-tests
+
 clean: fake
 	rm -f $(OBJS) otsprint otsmini
 

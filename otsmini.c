@@ -73,7 +73,7 @@ int main(int argc, char *argv[])
 	encode_fd = stdout;
 
 	enum mini_res res =
-		ots_mini_encode(&options, proof, len, buf, sizeof(buf), &outlen);
+		encode_ots_mini(&options, proof, len, buf, sizeof(buf), &outlen);
 
 	if (res != MINI_OK)
 		fail(res, mini_err_msg(res));
