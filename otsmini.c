@@ -83,6 +83,8 @@ static void ots_encode_cb(struct token *token)
 		if (token->data.op.class == OP_CLS_CRYPTO) {
 			writebuf(e, (u8*)&token->data.op.crypto.op, 1);
 			// TODO: refactor this logic, it's a bit hairy
+			// since we might not have a TOK_FILEHASH in
+			// the original file, we have to shimmy in it here.
 			if (!ots_encoder->filehash_done) {
 				if (token->data.op.crypto.datalen) {
 					debug("crypto datalen %d\n", token->data.op.crypto.datalen);
