@@ -1,5 +1,5 @@
 
-CFLAGS=-std=c99 -ggdb -O -Wall -Wextra -Werror
+CFLAGS=-std=c99 -DDEBUG -ggdb -O -Wall -Wextra -Werror
 
 OBJS=ots.o
 OBJS+=util.o
@@ -8,6 +8,7 @@ OBJS+=mini.o
 OBJS+=base58.o
 OBJS+=compiler.o
 OBJS+=decoder.o
+OBJS+=encoder.o
 OBJS+=print.o
 
 all: otsprint otsmini

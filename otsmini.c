@@ -9,20 +9,15 @@
 #include "base58.h"
 #include "util.h"
 #include "varint.h"
+#include "compiler.h"
 #include "print.h"
+#include "encoder.h"
 
 #define streq(a, b) strcmp(a, b) == 0
 
 static u8 buf[32768];
+static u8 buf2[32768];
 static char strbuf[4096];
-
-static void fail(int err, const char *msg)
-{
-	fprintf(stderr, "error: %s\n", msg);
-	exit(err);
-}
-
-static FILE *encode_fd;
 
 void usage()
 {
@@ -46,19 +41,56 @@ static const char *mini_err_msg(enum mini_res res)
 	return NULL;
 }
 
-static void print_cb(struct token *token) {
-	print_token(token);
+UNUSED static void print_cb(struct token *token)
+{
+	print_token(token, stderr);
 }
 
-static int handle_decode(const char *mini)
+static void ots_encode_cb(struct token *token)
+{
+	struct encoder *e =
+		(struct encoder *)token->user_data;
+
+	print_token(token, stderr);
+
+	switch (token->type) {
+	case TOK_VERSION:
+		writebuf(e, ots_proof_magic, sizeof(ots_proof_magic));
+		break;
+	case TOK_FILEHASH:
+		break;
+	case TOK_TIMESTAMP:
+		break;
+	case TOK_OP:
+		break;
+	case TOK_ATTESTATION:
+		break;
+	}
+}	
+
+static int handle_decode(const char *mini, FILE *encode_fd)
 {
 	size_t written;
 	int res;
+
 	res = wally_base58_to_bytes(mini, 0, buf, sizeof(buf), &written);
 	if (res != WALLY_OK)
 		fail(1, "base58 decode failed");
 
-	return parse_ots_mini(buf, written, print_cb, NULL);
+	struct encoder encoder = {
+		.buf = buf2,
+		.buflen = sizeof(buf2),
+		.cursor = buf2,
+	};
+
+	res = parse_ots_mini(buf, written, ots_encode_cb, &encoder);
+	if (res != DECODER_PARSE_OK)
+		fail(2, "otsmini decode failed");
+
+	written = encoder.cursor - encoder.buf;
+	debug("written: %zu\n", written);
+	fwrite(encoder.buf, written, 1, encode_fd);
+	return res;
 }
 
 static int handle_encode(struct mini_options *options, const u8 *proof,
@@ -97,6 +129,7 @@ static void assertok(enum decoder_state res)
 
 int main(int argc, char *argv[])
 {
+	FILE *encode_fd = stdout;
 	char *filename = NULL;
 	bool decode = false;
 	size_t len;
@@ -106,7 +139,7 @@ int main(int argc, char *argv[])
 		.strip_filehash = true,
 	};
 
-	if (argc < 2)
+	if (argc == 2 && (streq(argv[1], "-h") || streq(argv[1], "--help")))
 		usage();
 
 	for (int i = 1; i < argc; i++) {
@@ -120,9 +153,6 @@ int main(int argc, char *argv[])
 			filename = argv[i];
 	}
 
-
-	encode_fd = stdout;
-
 	if (decode) {
 		res = read_file_or_stdin(filename, (u8*)strbuf, sizeof(strbuf), &len);
 		strbuf[len-1] = 0;
@@ -130,7 +160,7 @@ int main(int argc, char *argv[])
 		if (res == 0)
 			fail(1, "input too large");
 
-		res = handle_decode(strbuf);
+		res = handle_decode(strbuf, encode_fd);
 		assertok(res);
 	}
 	else {

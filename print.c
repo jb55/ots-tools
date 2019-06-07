@@ -123,8 +123,8 @@ static char *attestation_type_name(enum attestation_type type) {
 	return "impossible";
 }
 
-static void print_op(struct op *op) {
-	printf("%s", op_tag_str(op->class, op));
+static void print_op(struct op *op, FILE *fd) {
+	fprintf(fd, "%s", op_tag_str(op->class, op));
 
 	switch (op->class) {
 	case OP_CLS_CRYPTO:
@@ -132,12 +132,12 @@ static void print_op(struct op *op) {
 			encode_crypto_digest(op->crypto.op,
 					     op->crypto.cryptodata,
 					     tmpbuf, sizeof(tmpbuf));
-			printf(" %s", tmpbuf);
+			fprintf(fd, " %s", tmpbuf);
 		}
 		break;
 	case OP_CLS_BINARY:
 		hex_encode(op->binary.bindata, op->binary.data_len, tmpbuf, sizeof(tmpbuf));
-		printf(" %s", tmpbuf);
+		fprintf(fd, " %s", tmpbuf);
 		break;
 	case OP_CLS_UNARY:
 		break;
@@ -145,45 +145,45 @@ static void print_op(struct op *op) {
 }
 
 
-static void print_attestation(struct attestation *attestation) {
+static void print_attestation(struct attestation *attestation, FILE *fd) {
 	const char *name = attestation_type_name(attestation->type);
-	printf("%s", name);
+	fprintf(fd, "%s", name);
 	switch (attestation->type) {
 	case ATTESTATION_PENDING:
-		printf(" %.*s\n", attestation->data_len,
+		fprintf(fd, " %.*s\n", attestation->data_len,
 			   attestation->data);
 		break;
 	case ATTESTATION_LITECOIN_BLOCK_HEADER:
 	case ATTESTATION_BITCOIN_BLOCK_HEADER:
-		printf(" height %d\n", attestation->height);
+		fprintf(fd, " height %d\n", attestation->height);
 		break;
 	case ATTESTATION_UNKNOWN:
 		hex_encode(attestation->data, attestation->data_len,
 				   tmpbuf, MAX_TMPBUF_SIZE);
-		printf("unknown %s\n", tmpbuf);
+		fprintf(fd, "unknown %s\n", tmpbuf);
 	}
 }
 
-void print_token(struct token *token) {
+void print_token(struct token *token, FILE *fd) {
 	switch (token->type) {
 	case TOK_VERSION:
-		printf("version %hhu", token->data.version);
-		printf("\n");
+		fprintf(fd, "version %hhu", token->data.version);
+		fprintf(fd, "\n");
 		break;
 	case TOK_OP:
-		print_op(&token->data.op);
-		printf("\n");
+		print_op(&token->data.op, fd);
+		fprintf(fd, "\n");
 		break;
 	case TOK_FILEHASH:
-		printf("file_hash ");
+		fprintf(fd, "file_hash ");
 		break;
 	case TOK_ATTESTATION:
-		printf("attestation ");
-		print_attestation(&token->data.attestation);
-		printf("\n");
+		fprintf(fd, "attestation ");
+		print_attestation(&token->data.attestation, fd);
+		fprintf(fd, "\n");
 		break;
 	case TOK_TIMESTAMP:
-		printf("  ts ");
+		fprintf(fd, "  ts ");
 		break;
 	}
 

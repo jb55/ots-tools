@@ -13,7 +13,7 @@ static FILE *encode_fd;
 static u8 buf[32768];
 
 static void proof_cb(struct token *token) {
-	print_token(token);
+	print_token(token, stdout);
 }
 
 int main(int argc UNUSED, char *argv[])

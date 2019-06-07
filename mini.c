@@ -10,16 +10,11 @@
 #include "ots_internal.h"
 #include "mini.h"
 #include "decoder.h"
+#include "encoder.h"
 #include "util.h"
 #include "varint.h"
 
 #define SUPPORTED_VERSION 0x1
-
-static void fail(int err, const char *msg)
-{
-	fprintf(stderr, "error: %s\n", msg);
-	exit(err);
-}
 
 const u8 ots_mini_magic[] = { 0x6f, 0x74, 0x73 };
 
@@ -65,35 +60,13 @@ static u8 ots_mini_encode_attestation_tag(const struct attestation *a)
 	return MINI_ATT_UNK;
 }
 
-static inline bool encode_overflows(struct encoder *encoder, int len)
-{
-	return encoder->cursor + len >= encoder->buf + encoder->buflen;
-}
-
-static void writebuf(struct encoder *encoder, const unsigned char *data, int len)
-{
-	if (encode_overflows(encoder, len))
-		fail(4, "buffer overrun");
-	memcpy(encoder->cursor, data, len);
-	encoder->cursor += len;
-}
-
-static void writebuf_varint(struct encoder *encoder, uint64_t n)
-{
-	int len = varint_length(n);
-	if (encode_overflows(encoder, len))
-		fail(4, "buffer overrun");
-	varint_write(encoder->cursor, n);
-	encoder->cursor += len;
-}
-
-static int ots_mini_write_tag(struct encoder *e, u8 tag)
+static int ots_mini_write_tag(struct mini_encoder *e, u8 tag)
 {
 	if (e->has_ts) {
 		tag |= 0x80;
 	}
 
-	writebuf(e, &tag, 1);
+	writebuf(e->encoder, &tag, 1);
 	e->has_ts = false;
 
 	return 1;
@@ -398,7 +371,7 @@ enum decoder_state parse_ots_mini(const u8 *buf, int len,
 
 void ots_mini_encode_fn(struct token *token)
 {
-	struct encoder *e = (struct encoder*)token->user_data;
+	struct mini_encoder *e = (struct mini_encoder*)token->user_data;
 	int *tokindex = &e->attest_loc->tokindex;
 	int data_len;
 
@@ -427,8 +400,8 @@ void ots_mini_encode_fn(struct token *token)
 		ver = token->data.version;
 		if (e->strip_filehash)
 			ver |= 0x80;
-		writebuf(e, ots_mini_magic, sizeof(ots_mini_magic));
-		writebuf(e, &ver, 1);
+		writebuf(e->encoder, ots_mini_magic, sizeof(ots_mini_magic));
+		writebuf(e->encoder, &ver, 1);
 		break;
 	case TOK_TIMESTAMP:
 		e->has_ts = true;
@@ -439,13 +412,13 @@ void ots_mini_encode_fn(struct token *token)
 		ots_mini_write_tag(e, tag);
 		switch (op->class) {
 		case OP_CLS_BINARY:
-			writebuf_varint(e, op->binary.data_len);
-			writebuf(e, op->binary.bindata, op->binary.data_len);
+			writebuf_varint(e->encoder, op->binary.data_len);
+			writebuf(e->encoder, op->binary.bindata, op->binary.data_len);
 			break;
 		case OP_CLS_CRYPTO:
 			if (op->crypto.datalen != 0) {
 				debug("writing file hash\n");
-				writebuf(e, op->crypto.cryptodata.sha1,
+				writebuf(e->encoder, op->crypto.cryptodata.sha1,
 					 op->crypto.datalen);
 			}
 			break;
@@ -461,8 +434,8 @@ void ots_mini_encode_fn(struct token *token)
 
 		debug("attestation data_len: %d\n", data_len);
 
-		writebuf_varint(e, data_len);
-		writebuf(e, token->data.attestation.raw_data, data_len);
+		writebuf_varint(e->encoder, data_len);
+		writebuf(e->encoder, token->data.attestation.raw_data, data_len);
 
 		e->attest_loc->done = true;
 		break;
@@ -490,12 +463,16 @@ enum mini_res encode_ots_mini(struct mini_options *opts, const u8 *proof,
 	};
 
 	struct encoder encoder = {
-		.attest_loc = &search,
-		.strip_filehash = opts? opts->strip_filehash : true,
-		.has_ts = false,
 		.buf = buf,
 		.buflen = bufsize,
 		.cursor = buf,
+	};
+
+	struct mini_encoder mencoder = {
+		.encoder = &encoder,
+		.attest_loc = &search,
+		.strip_filehash = opts? opts->strip_filehash : true,
+		.has_ts = false,
 	};
 
 	res = parse_ots_proof(proof, prooflen, ots_mini_find, &search);
@@ -514,7 +491,7 @@ enum mini_res encode_ots_mini(struct mini_options *opts, const u8 *proof,
 	search.tokindex = 0;
 	search.done = false;
 
-	res = parse_ots_proof(proof, prooflen, ots_mini_encode_fn, &encoder);
+	res = parse_ots_proof(proof, prooflen, ots_mini_encode_fn, &mencoder);
 	if (res != DECODER_PARSE_OK)
 		return MINI_ERR_OTS_PARSE_FAILED;
 

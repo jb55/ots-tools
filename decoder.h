@@ -1,6 +1,6 @@
 
-#ifndef OTS_ENCODER_H
-#define OTS_ENCODER_H
+#ifndef OTS_DECODER_H
+#define OTS_DECODER_H
 
 #include "short_types.h"
 #include <stdbool.h>
@@ -43,4 +43,4 @@ int consume_varbytes(struct cursor *cursor, int max_len, int min_len,
 	} while(0)
 
 
-#endif /* OTS_ENCODER_H */ 
+#endif /* OTS_DECODER_H */ 

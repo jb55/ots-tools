@@ -13,6 +13,7 @@
 
 typedef unsigned char u8;
 
+void fail(int err, const char *msg);
 int read_fd(FILE *fd, unsigned char *buf, size_t buflen, size_t *written);
 int read_file_or_stdin(const char *filename, unsigned char *buf, size_t buflen,
 		       size_t *written);

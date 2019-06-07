@@ -28,7 +28,7 @@ typedef unsigned char u8;
 // ots
 const u8 succinct_proof_magic[] = { 0x6f, 0x74, 0x73 };
 
-static const u8 proof_magic[] = {
+const u8 ots_proof_magic[] = {
 	0x00, 0x4f, 0x70, 0x65, 0x6e, 0x54, 0x69, 0x6d,
 	0x65, 0x73, 0x74, 0x61, 0x6d, 0x70, 0x73, 0x00,
 	0x00, 0x50, 0x72, 0x6f, 0x6f, 0x66, 0x00, 0xbf,
@@ -313,8 +313,8 @@ static int consume_timestamp(struct cursor *cursor, struct token *token,
 #undef consume_tag
 
 static int consume_magic(struct cursor *cursor) {
-	check_cursor(sizeof(proof_magic));
-	return consume_bytes(cursor, proof_magic, sizeof(proof_magic));
+	check_cursor(sizeof(ots_proof_magic));
+	return consume_bytes(cursor, ots_proof_magic, sizeof(ots_proof_magic));
 }
 
 static int consume_header(struct cursor *cursor, ots_token_cb *cb,

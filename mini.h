@@ -38,13 +38,11 @@ struct token_search {
 	int att_token_start;
 };
 
-struct encoder {
+struct mini_encoder {
+	struct encoder *encoder;
 	struct token_search *attest_loc;
 	bool strip_filehash;
 	bool has_ts;
-	unsigned char *buf;
-	int buflen;
-	unsigned char *cursor;
 };
 
 struct mini_options {

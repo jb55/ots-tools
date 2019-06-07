@@ -97,9 +97,11 @@ struct token {
 };
 
 
+extern const u8 ots_proof_magic[31];
 extern const u8 pending_attestation[ATTESTATION_TAG_SIZE];
 extern const u8 bitcoin_block_header_attestation[ATTESTATION_TAG_SIZE];
 extern const u8 litecoin_block_header_attestation[ATTESTATION_TAG_SIZE];
+
 
 
 typedef void (ots_token_cb)(struct token *tok);

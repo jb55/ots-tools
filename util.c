@@ -34,3 +34,9 @@ int read_file_or_stdin(const char *filename, unsigned char *buf, size_t buflen,
 		return read_fd(stdin, buf, buflen, written);
 	}
 }
+
+void fail(int err, const char *msg)
+{
+	fprintf(stderr, "error: %s\n", msg);
+	exit(err);
+}
