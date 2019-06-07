@@ -432,8 +432,6 @@ void ots_mini_encode_fn(struct token *token)
 
 		data_len = token->data.attestation.raw_data_len;
 
-		debug("attestation data_len: %d\n", data_len);
-
 		writebuf_varint(e->encoder, data_len);
 		writebuf(e->encoder, token->data.attestation.raw_data, data_len);
 
