@@ -165,7 +165,21 @@ static void print_attestation(struct attestation *attestation, FILE *fd) {
 	}
 }
 
+static void print_indents(int indent, FILE *fd) {
+	for (int i = 0; i < indent; i++)
+		fprintf(fd, "|    ");
+}
+
 void print_token(struct token *token, FILE *fd) {
+	static int indent = 0;
+	static bool at_fork = false;
+
+	if (!at_fork) {
+		print_indents(indent, fd);
+	}
+	else
+		at_fork = false;
+
 	switch (token->type) {
 	case TOK_VERSION:
 		fprintf(fd, "version %hhu", token->data.version.number);
@@ -181,12 +195,17 @@ void print_token(struct token *token, FILE *fd) {
 		fprintf(fd, "file_hash ");
 		break;
 	case TOK_ATTESTATION:
+		indent--;
 		fprintf(fd, "attestation ");
 		print_attestation(&token->data.attestation, fd);
-		fprintf(fd, "\n");
 		break;
 	case TOK_TIMESTAMP:
-		fprintf(fd, "  ts ");
+		fprintf(fd, "|\n");
+		print_indents(indent, fd);
+		indent++;
+		fprintf(fd, "\\--> ");
+		/* print_indents(indent, fd); */
+		at_fork = true;
 		break;
 	}
 

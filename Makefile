@@ -1,4 +1,4 @@
-CFLAGS=-std=c99 -DDEBUG -ggdb -O -Wall -Wextra -Werror
+CFLAGS=-std=c99 -ggdb -O -Wall -Wextra -Werror
 
 OBJS=ots.o
 OBJS+=util.o
