@@ -6,6 +6,7 @@
 #include "compiler.h"
 
 #include <strings.h>
+#include <stdio.h>
 
 /* Temporary stack buffer sizes */
 #define BIGNUM_WORDS 128u
@@ -278,7 +279,7 @@ int wally_base58_to_bytes(const char *str_in, uint32_t flags,
     *written = len;
     ret = base58_decode(str_in, strlen(str_in), bytes_out, written);
     if (!ret && *written > len)
-        return WALLY_OK; /* not enough space, return required amount */
+        return WALLY_ENOMEM; /* not enough space, return required amount */
 
     /* if (!ret && (flags & BASE58_FLAG_CHECKSUM)) { */
     /*     if (*written <= BASE58_CHECKSUM_LEN) { */
@@ -297,5 +298,5 @@ int wally_base58_to_bytes(const char *str_in, uint32_t flags,
     /*     wally_clear(bytes_out + offset, BASE58_CHECKSUM_LEN); */
     /*     *written -= BASE58_CHECKSUM_LEN; */
     /* } */
-    return ret;
+    return WALLY_OK;
 }

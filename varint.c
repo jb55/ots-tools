@@ -51,23 +51,23 @@ inline static void serialize_u64(unsigned char *dest, uint64_t data) {
 	memcpy(dest, &data, sizeof(data));
 }
 
-inline static unsigned char deserialize_u8(unsigned char *src) {
+inline static unsigned char deserialize_u8(const unsigned char *src) {
 	return *src;
 }
 
-inline static unsigned short deserialize_u16(unsigned char *src) {
+inline static unsigned short deserialize_u16(const unsigned char *src) {
 	unsigned short data;
 	memcpy(&data, src, sizeof(data));
 	return le16toh(data);
 }
 
-inline static unsigned int deserialize_u32(unsigned char *src) {
+inline static unsigned int deserialize_u32(const unsigned char *src) {
 	unsigned int data;
 	memcpy(&data, src, sizeof(data));
 	return le32toh(data);
 }
 
-inline static uint64_t deserialize_u64(unsigned char *src) {
+inline static uint64_t deserialize_u64(const unsigned char *src) {
 	uint64_t data;
 	memcpy(&data, src, sizeof(data));
 	return le64toh(data);
@@ -97,9 +97,9 @@ void varint_write(unsigned char *dest, uint64_t size)
 #define READERR(msg) \
 	{*ok = 0; return -1;}
 
-uint64_t varint_read(unsigned char *data, int *ok) {
-	unsigned char *p = data;
-	unsigned char chsize = deserialize_u8(p++);
+uint64_t varint_read(const unsigned char *data, int *ok) {
+	const unsigned char *p = data;
+	const unsigned char chsize = deserialize_u8(p++);
 	uint64_t ret_size = 0;
 
 	if (chsize < 253) {

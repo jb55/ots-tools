@@ -2,22 +2,35 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-unsigned char *file_contents(const char *filename, size_t *length) {
-	FILE *f = fopen(filename, "rb");
-	unsigned char *buffer;
+int read_fd(FILE *fd, unsigned char *buf, size_t buflen, size_t *written)
+{
+	unsigned char *p = buf;
+	int len = 0;
+	*written = 0;
 
-	if (!f) {
-		fprintf(stderr, "Unable to open %s for reading\n", filename);
-		return NULL;
+	do {
+		len = fread(p, 1, 4096, fd);
+		*written += len;
+		p += len;
+		if (p > buf + buflen)
+			return 0;
+	} while (len == 4096);
+
+	return 1;
+}
+
+
+int read_file_or_stdin(const char *filename, unsigned char *buf, size_t buflen,
+		       size_t *written)
+{
+	FILE *file = NULL;
+	if (filename != NULL) {
+		file = fopen(filename, "rb");
+		int ok = read_fd(file, buf, buflen, written);
+		fclose(file);
+		return ok;
 	}
-
-	fseek(f, 0, SEEK_END);
-	*length = (size_t)ftell(f);
-	fseek(f, 0, SEEK_SET);
-
-	buffer = malloc(*length+1);
-	*length = fread(buffer, 1, *length, f);
-	fclose(f);
-
-	return buffer;
+	else {
+		return read_fd(stdin, buf, buflen, written);
+	}
 }

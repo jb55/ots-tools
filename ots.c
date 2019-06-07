@@ -62,7 +62,7 @@ static int consume_version(struct cursor *cursor, u8 *ver) {
 	return ok;
 }
 
-static int parse_op_class(u8 type, enum op_class *class)
+int parse_op_class(u8 type, enum op_class *class)
 {
 	switch ((enum binary_op)type) {
 	case OP_APPEND:
@@ -103,9 +103,9 @@ int ots_cryptodata_size(struct crypto *crypto) {
 	return 20;
 }
 
-static int parse_crypto_op_payload(struct cursor *cursor, struct op *op)
+int parse_crypto_op_payload(struct cursor *cursor, struct op *op)
 {
-	u8 *digest;
+	const u8 *digest;
 	int digest_len;
 
 	op->class = OP_CLS_CRYPTO;
@@ -133,13 +133,8 @@ static int parse_crypto_op_payload(struct cursor *cursor, struct op *op)
 	return 0;
 }
 
-static int parse_crypto_op(struct cursor *cursor, struct op *op)
+int parse_crypto_op_body(struct cursor *cursor, u8 tag, struct op *op)
 {
-	u8 tag;
-
-	if (!consume_byte(cursor, &tag))
-		return 0;
-
 	if (!parse_op_class(tag, &op->class)) {
 		decoder_errmsg = "could not parse op class";
 		cursor->state = DECODER_ERR_CORRUPT;
@@ -158,6 +153,15 @@ static int parse_crypto_op(struct cursor *cursor, struct op *op)
 }
 
 
+static int parse_crypto_op(struct cursor *cursor, struct op *op)
+{
+	u8 tag;
+	if (!consume_byte(cursor, &tag))
+		return 0;
+
+	return parse_crypto_op_body(cursor, tag, op);
+}
+
 static int parse_binary_op_payload(struct cursor *cursor, struct op *op) {
 	static const unsigned int min_len = 1;
 	op->class = OP_CLS_BINARY;
@@ -168,7 +172,7 @@ static int parse_binary_op_payload(struct cursor *cursor, struct op *op) {
 }
 
 
-static int consume_op(struct cursor *cursor, u8 tag, struct op *op) {
+int consume_op(struct cursor *cursor, u8 tag, struct op *op) {
 	if (!parse_op_class(tag, &op->class)) {
 		decoder_errmsg = "could not parse OP class";
 		cursor->state = DECODER_ERR_CORRUPT;
@@ -193,7 +197,7 @@ static int consume_op(struct cursor *cursor, u8 tag, struct op *op) {
 	return 0;
 }
 
-static enum attestation_type parse_attestation_type(u8 *data) {
+static enum attestation_type parse_attestation_type(const u8 *data) {
 	if (attestation_eq(data, bitcoin_block_header_attestation))
 		return ATTESTATION_BITCOIN_BLOCK_HEADER;
 	else if (attestation_eq(data, pending_attestation))
@@ -204,24 +208,22 @@ static enum attestation_type parse_attestation_type(u8 *data) {
 	return ATTESTATION_UNKNOWN;
 }
 
-int consume_attestation(struct cursor *cursor,
-			struct attestation *attestation)
+int consume_attestation_body(struct cursor *cursor,
+			     struct attestation *attestation,
+			     enum attestation_type att_type)
 {
-	u8 *tag = cursor->p;
-	if (!consume_bytes(cursor, NULL, ATTESTATION_TAG_SIZE))
-		return 0;
-
-	attestation->type = parse_attestation_type(tag);
-
 	int len;
 	consume_varint(cursor, MAX_PAYLOAD_SIZE, &len);
+	attestation->type = att_type;
 	attestation->data_len = len;
+	attestation->raw_data_len = len;
+	attestation->raw_data = cursor->p;
 
 	switch (attestation->type) {
 	case ATTESTATION_PENDING:
 		if (!consume_varbytes(cursor, MAX_PAYLOAD_SIZE-1, 1,
 					&attestation->data_len,
-					&attestation->data))
+					(u8**)&attestation->data))
 			return 0;
 		break;
 	case ATTESTATION_UNKNOWN:
@@ -240,6 +242,19 @@ int consume_attestation(struct cursor *cursor,
 	return 1;
 }
 
+
+static int consume_attestation(struct cursor *cursor, struct attestation *att)
+{
+	const u8 *tag = cursor->p;
+	if (!consume_bytes(cursor, NULL, ATTESTATION_TAG_SIZE))
+		return 0;
+
+	enum attestation_type att_type = parse_attestation_type(tag);
+	return consume_attestation_body(cursor, att, att_type);
+}
+
+
+
 #define consume_tag(tag)				\
 	if (!consume_byte(cursor, &tag)) return 0
 
@@ -247,7 +262,7 @@ static int consume_timestamp(struct cursor *cursor, struct token *token,
 				 ots_token_cb *cb);
 
 static int consume_tag_or_attestation(struct cursor *cursor, u8 tag,
-					  struct token *token, ots_token_cb *cb) {
+				      struct token *token, ots_token_cb *cb) {
 	if (tag == 0x00) {
 		if (!consume_attestation(cursor, &token->data.attestation))
 			return 0;
@@ -334,8 +349,8 @@ static int consume_crypto_op(struct cursor *cursor, struct token *token) {
 	return 1;
 }
 
-enum decoder_state parse_ots_proof(u8 *buf, int len, ots_token_cb *cb,
-				     void *user_data)
+enum decoder_state parse_ots_proof(const u8 *buf, int len, ots_token_cb *cb,
+				   void *user_data)
 {
 	struct token token = { .user_data = user_data };
 	struct cursor cursor_data;

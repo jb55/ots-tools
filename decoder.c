@@ -15,6 +15,12 @@ void init_cursor(struct cursor *cursor) {
 };
 
 
+bool cursor_eof(struct cursor *cursor)
+{
+	return cursor->p >= cursor->end;
+}
+
+
 int consume_bytes(struct cursor *cursor, const u8 *bytes,
 			 unsigned int bytes_len) {
 	// this should only trigger if we've missed a check_cursor up above
@@ -85,7 +91,8 @@ int consume_varint(struct cursor *cursor, int max_len, int *res)
 
 
 int consume_varbytes(struct cursor *cursor, int max_len,
-		     int min_len, int *len, u8 **data) {
+		     int min_len, int *len, u8 **data)
+{
 	if (!consume_varint(cursor, max_len, len)) {
 		cursor->state = DECODER_ERR_CORRUPT;
 		return 0;
@@ -103,6 +110,6 @@ int consume_varbytes(struct cursor *cursor, int max_len,
 		return 0;
 	}
 
-	*data = cursor->p;
+	*data = (u8*)cursor->p;
 	return consume_bytes(cursor, NULL, *len);
 }

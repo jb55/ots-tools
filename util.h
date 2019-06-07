@@ -2,7 +2,7 @@
 #ifndef OTS_UTIL_H
 #define OTS_UTIL_H
 
-#include <stdlib.h>
+#include <stdio.h>
 
 #ifdef DEBUG
 	#define debug(...) fprintf(stderr, __VA_ARGS__)
@@ -13,7 +13,8 @@
 
 typedef unsigned char u8;
 
-unsigned char *file_contents(const char *filename, size_t *length);
-
+int read_fd(FILE *fd, unsigned char *buf, size_t buflen, size_t *written);
+int read_file_or_stdin(const char *filename, unsigned char *buf, size_t buflen,
+		       size_t *written);
 
 #endif /* OTS_UTIL_H */

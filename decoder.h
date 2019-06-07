@@ -3,6 +3,7 @@
 #define OTS_ENCODER_H
 
 #include "short_types.h"
+#include <stdbool.h>
 
 
 enum decoder_state {
@@ -14,13 +15,14 @@ enum decoder_state {
 };
 
 struct cursor {
-	u8 *p;
-	u8 *end;
+	const u8 *p;
+	const u8 *end;
 	int state;
 };
 
 extern char *decoder_errmsg;
 
+bool cursor_eof(struct cursor *cursor);
 void init_cursor(struct cursor *cursor);
 int consume_bytes(struct cursor *cursor, const u8 *bytes, u32 bytes_len);
 int consume_matching_byte(struct cursor *cursor, const u8 byte);

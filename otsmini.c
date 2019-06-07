@@ -9,9 +9,12 @@
 #include "base58.h"
 #include "util.h"
 #include "varint.h"
+#include "print.h"
 
 #define streq(a, b) strcmp(a, b) == 0
 
+static u8 buf[32768];
+static char strbuf[4096];
 
 static void fail(int err, const char *msg)
 {
@@ -43,12 +46,61 @@ static const char *mini_err_msg(enum mini_res res)
 	return NULL;
 }
 
+static void print_cb(struct token *token) {
+	print_token(token);
+}
+
+static int handle_decode(const char *mini)
+{
+	size_t written;
+	int res;
+	res = wally_base58_to_bytes(mini, 0, buf, sizeof(buf), &written);
+	if (res != WALLY_OK)
+		fail(1, "base58 decode failed");
+
+	return parse_ots_mini(buf, written, print_cb, NULL);
+}
+
+static int handle_encode(struct mini_options *options, const u8 *proof,
+			 int prooflen)
+{
+	int outlen;
+
+	enum mini_res res =
+		encode_ots_mini(options, proof, prooflen, buf, sizeof(buf), &outlen);
+
+	if (res != MINI_OK)
+		fail(res, mini_err_msg(res));
+
+	char *out;
+	int ok =
+		wally_base58_from_bytes(buf, outlen, 0, &out);
+
+	if (ok != WALLY_OK)
+		fail(5, "base58 encode failed");
+
+	printf("%s\n", out);
+	free(out);
+
+	return res;
+}
+
+static void assertok(enum decoder_state res)
+{
+	if (res != DECODER_PARSE_OK) {
+		printf("error: %s, %s\n", describe_parse_state(res),
+		       decoder_errmsg);
+		exit(1);
+	}
+}
+
+
 int main(int argc, char *argv[])
 {
-	static u8 buf[32768];
-	size_t len;
-	int outlen;
 	char *filename = NULL;
+	bool decode = false;
+	size_t len;
+	int res;
 	struct mini_options options = {
 		.upgraded = false,
 		.strip_filehash = true,
@@ -62,33 +114,33 @@ int main(int argc, char *argv[])
 			options.upgraded = true;
 		else if (streq(argv[i], "--keep-filehash"))
 			options.strip_filehash = false;
+		else if (streq(argv[i], "-d") || streq(argv[i], "--decode"))
+			decode = true;
 		else
 			filename = argv[i];
 	}
 
-	if (filename == NULL)
-		usage();
 
-	u8 *proof = file_contents(filename, &len);
 	encode_fd = stdout;
 
-	enum mini_res res =
-		encode_ots_mini(&options, proof, len, buf, sizeof(buf), &outlen);
+	if (decode) {
+		res = read_file_or_stdin(filename, (u8*)strbuf, sizeof(strbuf), &len);
+		strbuf[len-1] = 0;
 
-	if (res != MINI_OK)
-		fail(res, mini_err_msg(res));
+		if (res == 0)
+			fail(1, "input too large");
 
-	char *out;
-	int ok =
-		wally_base58_from_bytes(buf, outlen, 0, &out);
+		res = handle_decode(strbuf);
+		assertok(res);
+	}
+	else {
+		res = read_file_or_stdin(filename, buf, sizeof(buf), &len);
 
-	if (ok != WALLY_OK)
-		fail(5, "base58 encode failed");
+		if (res == 0)
+			fail(1, "input too large");
 
-	printf("%s\n", out);
-
-	free(out);
-	free(proof);
+		handle_encode(&options, buf, len);
+	}
 
 	return 0;
 }

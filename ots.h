@@ -78,7 +78,9 @@ struct op {
 
 struct attestation {
 	enum attestation_type type;
-	unsigned char *data;
+	const unsigned char *data;
+	const u8 *raw_data;
+	int raw_data_len;
 	int height;
 	int data_len;
 };
@@ -104,7 +106,7 @@ typedef void (ots_token_cb)(struct token *tok);
 
 const char *describe_parse_state(enum decoder_state state);
 
-enum decoder_state parse_ots_proof(unsigned char *buf, int len,
+enum decoder_state parse_ots_proof(const unsigned char *buf, int len,
 				   ots_token_cb *cb, void *user_data);
 
 extern char *ots_errmsg;

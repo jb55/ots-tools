@@ -8,6 +8,7 @@ OBJS+=mini.o
 OBJS+=base58.o
 OBJS+=compiler.o
 OBJS+=decoder.o
+OBJS+=print.o
 
 all: otsprint otsmini
 
