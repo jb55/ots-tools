@@ -516,7 +516,7 @@ enum decoder_state parse_ots_mini(u8 *buf, int len,
 }
 
 
-void ots_mini_encode(struct token *token)
+void ots_mini_encode_fn(struct token *token)
 {
 	struct encoder *e = (struct encoder*)token->user_data;
 	int *tokindex = &e->attest_loc->tokindex;
@@ -591,4 +591,53 @@ void ots_mini_encode(struct token *token)
 	}
 
 	(*tokindex)++;
+}
+
+
+enum mini_res ots_mini_encode(struct mini_options *opts, u8 *proof, int prooflen,
+			      u8 *buf, int bufsize, int *outlen)
+{
+	enum decoder_state res;
+
+	struct token_search search = {
+		.done = false,
+		.att_token_start = -1,
+		.att_candidate_payload_size = 0,
+		.att_payload_size = 0,
+		.upgraded = opts? opts->upgraded : false,
+		.tokindex = 0,
+	};
+
+	struct encoder encoder = {
+		.attest_loc = &search,
+		.strip_filehash = opts? opts->strip_filehash : true,
+		.has_ts = false,
+		.buf = buf,
+		.buflen = bufsize,
+		.cursor = buf,
+	};
+
+	res = parse_ots_proof(proof, prooflen, ots_mini_find, &search);
+	if (res != DECODER_PARSE_OK)
+		return MINI_ERR_OTS_PARSE_FAILED;
+
+	search.done = search.done || search.att_token_start_candidate != 0;
+
+	if (!search.done) {
+		if (search.upgraded)
+			return MINI_ERR_UPGRADED_NOT_FOUND;
+		else
+			return MINI_ERR_PENDING_NOT_FOUND;
+	}
+
+	search.tokindex = 0;
+	search.done = false;
+
+	res = parse_ots_proof(proof, prooflen, ots_mini_encode_fn, &encoder);
+	if (res != DECODER_PARSE_OK)
+		return MINI_ERR_OTS_PARSE_FAILED;
+
+	*outlen = encoder.cursor - buf;
+
+	return MINI_OK;
 }

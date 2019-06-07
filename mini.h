@@ -5,6 +5,13 @@
 #include <stdbool.h>
 #include "ots.h"
 
+enum mini_res {
+	MINI_OK,
+	MINI_ERR_UPGRADED_NOT_FOUND,
+	MINI_ERR_PENDING_NOT_FOUND,
+	MINI_ERR_OTS_PARSE_FAILED,
+};
+
 enum mini_attestation {
 	MINI_ATT_PEND = 0x1A,
 	MINI_ATT_UNK  = 0x1B,
@@ -85,10 +92,16 @@ struct mini_token {
 	} data;
 };
 
+struct mini_options {
+	bool upgraded;
+	bool strip_filehash;
+};
+
 typedef void (mini_ots_token_cb)(struct mini_token *tok);
 
-void ots_mini_find(struct token *token);
-void ots_mini_encode(struct token *token);
+enum mini_res ots_mini_encode(struct mini_options *opts, u8 *proof, int prooflen,
+			      u8 *buf, int bufsize, int *outlen);
+
 extern const unsigned char ots_mini_magic[3];
 
 #endif /* OTS_MINI_H */

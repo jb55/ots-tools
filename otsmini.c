@@ -21,44 +21,37 @@ static void fail(int err, const char *msg)
 
 static FILE *encode_fd;
 
-static void assertok(enum decoder_state res)
-{
-	if (res != DECODER_PARSE_OK) {
-		printf("error: %s, %s\n", describe_parse_state(res),
-		       decoder_errmsg);
-		exit(1);
-	}
-}
-
 void usage()
 {
-	printf("usage: otsmini [--upgraded] <proof.ots>\n");
+	printf("usage: otsmini [--upgraded,--keep-filehash] <proof.ots>\n");
 	exit(1);
+}
+
+static const char *mini_err_msg(enum mini_res res)
+{
+	switch (res) {
+	case MINI_OK:
+		return NULL;
+	case MINI_ERR_OTS_PARSE_FAILED:
+		return decoder_errmsg;
+	case MINI_ERR_PENDING_NOT_FOUND:
+		return "pending attestation not found";
+	case MINI_ERR_UPGRADED_NOT_FOUND:
+		return "upgraded attestation not found";
+	}
+
+	return NULL;
 }
 
 int main(int argc, char *argv[])
 {
-	size_t len = 0;
 	static u8 buf[32768];
+	size_t len;
+	int outlen;
 	char *filename = NULL;
-	enum decoder_state res;
-
-	struct token_search search = {
-		.done = false,
-		.att_token_start = -1,
-		.att_candidate_payload_size = 0,
-		.att_payload_size = 0,
+	struct mini_options options = {
 		.upgraded = false,
-		.tokindex = 0,
-	};
-
-	struct encoder encoder = {
-		.attest_loc = &search,
-		.strip_filehash = false,
-		.has_ts = false,
-		.buf = buf,
-		.buflen = sizeof(buf),
-		.cursor = buf,
+		.strip_filehash = true,
 	};
 
 	if (argc < 2)
@@ -66,9 +59,9 @@ int main(int argc, char *argv[])
 
 	for (int i = 1; i < argc; i++) {
 		if (streq(argv[i], "--upgraded"))
-			search.upgraded = true;
-		else if (streq(argv[i], "--no-filehash"))
-			encoder.strip_filehash = true;
+			options.upgraded = true;
+		else if (streq(argv[i], "--keep-filehash"))
+			options.strip_filehash = false;
 		else
 			filename = argv[i];
 	}
@@ -79,29 +72,15 @@ int main(int argc, char *argv[])
 	u8 *proof = file_contents(filename, &len);
 	encode_fd = stdout;
 
-	res = parse_ots_proof(proof, len, ots_mini_find, &search);
-	assertok(res);
+	enum mini_res res =
+		ots_mini_encode(&options, proof, len, buf, sizeof(buf), &outlen);
 
-	search.done = search.done || search.att_token_start_candidate != 0;
-
-	if (!search.done) {
-		if (search.upgraded)
-			fail(2, "ots file is not an upgraded timestamp");
-		else
-			fail(2, "no non-upgraded attestation not found, try --upgraded");
-	}
-
-	search.tokindex = 0;
-	search.done = false;
-
-	res = parse_ots_proof(proof, len, ots_mini_encode, &encoder);
-	assertok(res);
+	if (res != MINI_OK)
+		fail(res, mini_err_msg(res));
 
 	char *out;
 	int ok =
-		wally_base58_from_bytes(encoder.buf,
-					encoder.cursor - encoder.buf,
-					0, &out);
+		wally_base58_from_bytes(buf, outlen, 0, &out);
 
 	if (ok != WALLY_OK)
 		fail(5, "base58 encode failed");
