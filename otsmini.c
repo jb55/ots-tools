@@ -89,7 +89,6 @@ static int handle_decode(const char *mini, FILE *encode_fd)
 		fail(2, "otsmini decode failed");
 
 	written = encoder.cursor - encoder.buf;
-	debug("written: %zu\n", written);
 	fwrite(encoder.buf, written, 1, encode_fd);
 	return res;
 }
