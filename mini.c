@@ -426,7 +426,7 @@ void ots_mini_encode_fn(struct token *token)
 			writebuf(e->encoder, op->binary.bindata, op->binary.data_len);
 			break;
 		case OP_CLS_CRYPTO:
-			if (op->crypto.datalen != 0) {
+			if (!e->strip_filehash && op->crypto.datalen != 0) {
 				debug("writing file hash\n");
 				writebuf(e->encoder, op->crypto.cryptodata.sha1,
 					 op->crypto.datalen);

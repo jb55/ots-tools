@@ -42,6 +42,7 @@ static int hex_encode(const u8 *buf, size_t bufsize, char *dest, size_t dest_siz
 }
 
 
+
 static int encode_crypto_digest(enum crypto_op op, union crypto_data crypto,
 								char *buf, size_t bufsize) {
 #define encode_digest(typ)										\

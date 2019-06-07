@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
+#include <assert.h>
 
 #include "ots.h"
 #include "ots_internal.h"
@@ -51,8 +52,10 @@ static void ots_encode_cb(struct token *token)
 {
 	const u8 *tag;
 	int len;
-	struct encoder *e =
-		(struct encoder *)token->user_data;
+	struct mini_ots_encoder *ots_encoder =
+		(struct mini_ots_encoder *)token->user_data;
+
+	struct encoder *e = ots_encoder->encoder;
 
 	print_token(token, stderr);
 
@@ -60,17 +63,39 @@ static void ots_encode_cb(struct token *token)
 	case TOK_VERSION:
 		writebuf(e, ots_proof_magic, sizeof(ots_proof_magic));
 		writebuf(e, &token->data.version.number, 1);
+		if (!token->data.version.has_filehash &&
+		    ots_encoder->options->filehash.datalen == 0) {
+			fail(2, "filehash not found, please provide --filehash");
+		}
+
+		if (!token->data.version.has_filehash) {
+			debug("writing miniots -> ots filehash\n");
+			assert(ots_encoder->options->filehash.datalen != 0);
+		}
+
 		break;
 	case TOK_TIMESTAMP:
-		writebuf(e, (u8*)&"\xff", 1);
+		// TODO: rename this to TOK_FORK
+		// we don't need a fork if we're only returning 1
+		/* writebuf(e, (u8*)&"\xff", 1); */
 		break;
 	case TOK_OP:
 		if (token->data.op.class == OP_CLS_CRYPTO) {
 			writebuf(e, (u8*)&token->data.op.crypto.op, 1);
-			if (is_filehash_op(token)) {
-				debug("crypto datalen %d\n", token->data.op.crypto.datalen);
-				writebuf(e, token->data.op.crypto.cryptodata.sha1,
-					 token->data.op.crypto.datalen);
+			// TODO: refactor this logic, it's a bit hairy
+			if (!ots_encoder->filehash_done) {
+				if (token->data.op.crypto.datalen) {
+					debug("crypto datalen %d\n", token->data.op.crypto.datalen);
+					writebuf(e, token->data.op.crypto.cryptodata.sha1,
+						 token->data.op.crypto.datalen);
+				}
+				else {
+					writebuf(e, (u8*)&ots_encoder->options->filehash.cryptodata,
+						 ots_encoder->options->filehash.datalen);
+				}
+
+
+				ots_encoder->filehash_done = true;
 			}
 		}
 		else if (token->data.op.class == OP_CLS_BINARY) {
@@ -94,11 +119,12 @@ static void ots_encode_cb(struct token *token)
 
 		break;
 	case TOK_FILEHASH:
+		debug("ots_encode filehash\n");
 		break;
 	}
-}	
+}
 
-static int handle_decode(const char *mini, FILE *encode_fd)
+static int handle_decode(struct mini_options *opts, const char *mini, FILE *encode_fd)
 {
 	size_t written;
 	int res;
@@ -113,7 +139,13 @@ static int handle_decode(const char *mini, FILE *encode_fd)
 		.cursor = buf2,
 	};
 
-	res = parse_ots_mini(buf, written, ots_encode_cb, &encoder);
+	struct mini_ots_encoder ots_encoder = {
+		.options = opts,
+		.encoder = &encoder,
+		.filehash_done = false,
+	};
+
+	res = parse_ots_mini(buf, written, ots_encode_cb, &ots_encoder);
 	if (res != DECODER_PARSE_OK)
 		fail(2, "otsmini decode failed");
 
@@ -155,6 +187,14 @@ static void assertok(enum decoder_state res)
 	}
 }
 
+static int parse_filehash(const char *hex, struct crypto *hash)
+{
+	if (strlen(hex) != 64)
+		fail(1, "only sha256 hashes are supported by --filehash at the moment");
+	hash->op = OP_SHA256;
+	hash->datalen = 32;
+	return hex_decode(hex, strlen(hex), &hash->cryptodata, sizeof(hash->cryptodata));
+}
 
 int main(int argc, char *argv[])
 {
@@ -168,6 +208,8 @@ int main(int argc, char *argv[])
 		.strip_filehash = true,
 	};
 
+	options.filehash.datalen = 0;
+
 	if (argc == 2 && (streq(argv[1], "-h") || streq(argv[1], "--help")))
 		usage();
 
@@ -176,6 +218,8 @@ int main(int argc, char *argv[])
 			options.upgraded = true;
 		else if (streq(argv[i], "--keep-filehash"))
 			options.strip_filehash = false;
+		else if (streq(argv[i], "--filehash"))
+			parse_filehash(argv[(i++)+1], &options.filehash);
 		else if (streq(argv[i], "-d") || streq(argv[i], "--decode"))
 			decode = true;
 		else
@@ -188,8 +232,8 @@ int main(int argc, char *argv[])
 
 		if (res == 0)
 			fail(1, "input too large");
-		
-		res = handle_decode(strbuf, encode_fd);
+
+		res = handle_decode(&options, strbuf, encode_fd);
 		assertok(res);
 	}
 	else {

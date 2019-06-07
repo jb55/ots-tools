@@ -26,9 +26,9 @@ enum op_class {
 };
 
 enum crypto_op {
-	OP_SHA1	 = 0x02,
+	OP_SHA1      = 0x02,
 	OP_RIPEMD160 = 0x03,
-	OP_SHA256	 = 0x08,
+	OP_SHA256    = 0x08,
 	OP_KECCAK256 = 0x67,
 };
 

@@ -50,7 +50,15 @@ struct mini_encoder {
 struct mini_options {
 	bool upgraded;
 	bool strip_filehash;
+	struct crypto filehash;
 };
+
+struct mini_ots_encoder {
+	bool filehash_done;
+	struct encoder *encoder;
+	struct mini_options *options;
+};
+
 
 enum decoder_state parse_ots_mini(const u8 *buf, int len, ots_token_cb *cb,
 				  void *user_data);

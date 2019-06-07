@@ -8,5 +8,4 @@
 void print_token(struct token *token, FILE *fd);
 
 
-
 #endif /* PRINT_H */

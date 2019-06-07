@@ -1,4 +1,3 @@
-
 CFLAGS=-std=c99 -DDEBUG -ggdb -O -Wall -Wextra -Werror
 
 OBJS=ots.o
@@ -12,6 +11,9 @@ OBJS+=encoder.o
 OBJS+=print.o
 
 all: otsprint otsmini
+
+%.o: %.c %.h
+	$(CC) $(CFLAGS) -c $<
 
 otsprint: otsprint.c $(OBJS)
 	$(CC) $(CFLAGS) $^ -o $@
