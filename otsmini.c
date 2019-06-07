@@ -56,6 +56,7 @@ static void ots_encode_cb(struct token *token)
 	switch (token->type) {
 	case TOK_VERSION:
 		writebuf(e, ots_proof_magic, sizeof(ots_proof_magic));
+		writebuf(e, &token->data.version, 1);
 		break;
 	case TOK_FILEHASH:
 		break;
