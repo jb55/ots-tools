@@ -31,6 +31,8 @@ enum mini_tag {
 struct token_search {
 	bool done;
 	bool upgraded;
+	bool first_ts;
+	int end_header_index;
 	int tokindex;
 	int att_token_start_candidate;
 	int att_candidate_payload_size;

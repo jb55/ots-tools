@@ -83,6 +83,18 @@ void ots_mini_find(struct token *token)
 		return;
 
 	switch (token->type) {
+	case TOK_TIMESTAMP:
+		if (!search->first_ts)
+			break;
+
+		debug("first ts\n");
+		search->first_ts = false;
+		search->end_header_index = search->tokindex;
+		search->att_token_start = search->tokindex;
+		search->att_payload_size = 0;
+
+		break;
+
 	case TOK_ATTESTATION:
 		typ = token->data.attestation.type;
 
@@ -126,13 +138,7 @@ void ots_mini_find(struct token *token)
 
 	case TOK_OP:
 		// very start of the file
-		if (token->data.op.class == OP_CLS_CRYPTO &&
-		    token->data.op.crypto.datalen != 0)
-		{
-			search->att_token_start = search->tokindex+1;
-			search->att_payload_size = 0;
-		}
-		else if (token->data.op.class == OP_CLS_BINARY)
+		if (token->data.op.class == OP_CLS_BINARY)
 		{
 			search->att_payload_size +=
 				token->data.op.binary.data_len;
@@ -188,7 +194,8 @@ static int consume_mini_header(struct cursor *cursor,
 	if (!ok) return ok;
 
 	tok.type = TOK_VERSION;
-	tok.data.version = version;
+	tok.data.version.number = version;
+	tok.data.version.has_filehash = *has_filehash;
 	(*cb)(&tok);
 
 	return 1;
@@ -232,6 +239,7 @@ static int parse_mini_crypto_op(struct cursor *cursor, struct op *op)
 
 static int consume_mini_crypto_op(struct cursor *cursor, struct token *token)
 {
+
 	if (!parse_mini_crypto_op(cursor, &token->data.op)) {
 		cursor->state = DECODER_ERR_CORRUPT;
 		decoder_errmsg = "expected file hash";
@@ -359,6 +367,8 @@ enum decoder_state parse_ots_mini(const u8 *buf, int len,
 
 		if (!consume_mini_crypto_op(cursor, &token))
 			return cursor->state;
+
+		(*cb)(&token);
 	}
 
 	if (!consume_mini_timestamp(cursor, &token, cb))
@@ -388,16 +398,16 @@ void ots_mini_encode_fn(struct token *token)
 	// TODO: this is a bit brittle if the format ever changes
 	// TODO: we could leave off file_hash for really small timestamps?
 
-	int skip = e->strip_filehash? 2 : 3;
+	int skip = e->attest_loc->end_header_index;
 
-	if (*tokindex >= skip && *tokindex < e->attest_loc->att_token_start_candidate) {
+	if (*tokindex > skip && *tokindex < e->attest_loc->att_token_start_candidate) {
 		(*tokindex)++;
 		return;
 	}
 
 	switch (token->type) {
 	case TOK_VERSION:
-		ver = token->data.version;
+		ver = token->data.version.number;
 		if (e->strip_filehash)
 			ver |= 0x80;
 		writebuf(e->encoder, ots_mini_magic, sizeof(ots_mini_magic));
@@ -453,6 +463,7 @@ enum mini_res encode_ots_mini(struct mini_options *opts, const u8 *proof,
 
 	struct token_search search = {
 		.done = false,
+		.first_ts = true,
 		.att_token_start = -1,
 		.att_candidate_payload_size = 0,
 		.att_payload_size = 0,
@@ -474,6 +485,8 @@ enum mini_res encode_ots_mini(struct mini_options *opts, const u8 *proof,
 	};
 
 	res = parse_ots_proof(proof, prooflen, ots_mini_find, &search);
+	search.first_ts = true;
+
 	if (res != DECODER_PARSE_OK)
 		return MINI_ERR_OTS_PARSE_FAILED;
 

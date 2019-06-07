@@ -85,12 +85,16 @@ struct attestation {
 	int data_len;
 };
 
+struct version {
+	unsigned char number;
+	bool has_filehash;
+};
 
 struct token {
 	void *user_data;
 	enum token_type type;
 	union {
-		unsigned char version;
+		struct version version;
 		struct op op;
 		struct attestation attestation;
 	} data;

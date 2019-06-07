@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "ots.h"
+#include "ots_internal.h"
 #include "mini.h"
 #include "short_types.h"
 #include "base58.h"
@@ -48,6 +49,8 @@ UNUSED static void print_cb(struct token *token)
 
 static void ots_encode_cb(struct token *token)
 {
+	const u8 *tag;
+	int len;
 	struct encoder *e =
 		(struct encoder *)token->user_data;
 
@@ -56,15 +59,41 @@ static void ots_encode_cb(struct token *token)
 	switch (token->type) {
 	case TOK_VERSION:
 		writebuf(e, ots_proof_magic, sizeof(ots_proof_magic));
-		writebuf(e, &token->data.version, 1);
-		break;
-	case TOK_FILEHASH:
+		writebuf(e, &token->data.version.number, 1);
 		break;
 	case TOK_TIMESTAMP:
+		writebuf(e, (u8*)&"\xff", 1);
 		break;
 	case TOK_OP:
+		if (token->data.op.class == OP_CLS_CRYPTO) {
+			writebuf(e, (u8*)&token->data.op.crypto.op, 1);
+			if (is_filehash_op(token)) {
+				debug("crypto datalen %d\n", token->data.op.crypto.datalen);
+				writebuf(e, token->data.op.crypto.cryptodata.sha1,
+					 token->data.op.crypto.datalen);
+			}
+		}
+		else if (token->data.op.class == OP_CLS_BINARY) {
+			writebuf(e, (u8*)&token->data.op.binary.op, 1);
+			writebuf_varint(e, token->data.op.binary.data_len);
+			writebuf(e, token->data.op.binary.bindata,
+				token->data.op.binary.data_len);
+		}
+		else if (token->data.op.class == OP_CLS_UNARY) {
+			writebuf(e, (u8*)&token->data.op.unary_op, 1);
+		}
+
 		break;
 	case TOK_ATTESTATION:
+		tag = get_attestation_tag(token->data.attestation.type, &len);
+		writebuf(e, (u8*)&"\0", 1);
+		writebuf(e, tag, len);
+		writebuf_varint(e, token->data.attestation.raw_data_len);
+		writebuf(e, token->data.attestation.raw_data,
+			 token->data.attestation.raw_data_len);
+
+		break;
+	case TOK_FILEHASH:
 		break;
 	}
 }	
@@ -159,7 +188,7 @@ int main(int argc, char *argv[])
 
 		if (res == 0)
 			fail(1, "input too large");
-
+		
 		res = handle_decode(strbuf, encode_fd);
 		assertok(res);
 	}

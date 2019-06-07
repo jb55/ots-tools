@@ -167,7 +167,9 @@ static void print_attestation(struct attestation *attestation, FILE *fd) {
 void print_token(struct token *token, FILE *fd) {
 	switch (token->type) {
 	case TOK_VERSION:
-		fprintf(fd, "version %hhu", token->data.version);
+		fprintf(fd, "version %hhu", token->data.version.number);
+		if (!token->data.version.has_filehash)
+			fprintf(fd, " (without filehash)");
 		fprintf(fd, "\n");
 		break;
 	case TOK_OP:

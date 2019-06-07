@@ -7,6 +7,7 @@
 #include <limits.h>
 
 #include "ots.h"
+#include "util.h"
 #include "decoder.h"
 
 #define STR_DETAIL(x) #x
@@ -48,6 +49,12 @@ const u8 litecoin_block_header_attestation[ATTESTATION_TAG_SIZE] = {
 };
 
 
+int is_filehash_op(struct token *tok)
+{
+	return tok->type == TOK_OP &&
+		tok->data.op.class == OP_CLS_CRYPTO &&
+		tok->data.op.crypto.datalen != 0;
+}
 
 // NOTE: this is technically a varuint
 static int consume_version(struct cursor *cursor, u8 *ver) {
@@ -197,6 +204,27 @@ int consume_op(struct cursor *cursor, u8 tag, struct op *op) {
 	return 0;
 }
 
+const u8 *get_attestation_tag(enum attestation_type at, int *len)
+{
+	switch(at) {
+	case ATTESTATION_BITCOIN_BLOCK_HEADER:
+		*len = sizeof(bitcoin_block_header_attestation);
+		return bitcoin_block_header_attestation;
+	case ATTESTATION_LITECOIN_BLOCK_HEADER:
+		*len = sizeof(litecoin_block_header_attestation);
+		return litecoin_block_header_attestation;
+	case ATTESTATION_PENDING:
+		*len = sizeof(pending_attestation);
+		return pending_attestation;
+	case ATTESTATION_UNKNOWN:
+		*len = 0;
+		return NULL;
+	}
+
+	*len = 0;
+	return NULL;
+}
+
 static enum attestation_type parse_attestation_type(const u8 *data) {
 	if (attestation_eq(data, bitcoin_block_header_attestation))
 		return ATTESTATION_BITCOIN_BLOCK_HEADER;
@@ -277,6 +305,8 @@ static int consume_tag_or_attestation(struct cursor *cursor, u8 tag,
 		(*cb)(token);
 		if (!consume_timestamp(cursor, token, cb))
 			return 0;
+
+		/* debug("FFFFFFFFF\n"); */
 	}
 	return 1;
 }
@@ -287,12 +317,12 @@ static int consume_timestamp(struct cursor *cursor, struct token *token,
 {
 	u8 tag;
 
-	token->type = TOK_TIMESTAMP;
-	(*cb)(token);
-
 	consume_tag(tag);
 
 	while (tag == 0xff) {
+		token->type = TOK_TIMESTAMP;
+		(*cb)(token);
+
 		consume_tag(tag);
 
 		if (!consume_tag_or_attestation(cursor, tag, token, cb))
@@ -305,7 +335,6 @@ static int consume_timestamp(struct cursor *cursor, struct token *token,
 		decoder_errmsg = "failed to consume final timestamp tag or attestation";
 		return 0;
 	}
-
 
 	return 1;
 }
@@ -331,7 +360,8 @@ static int consume_header(struct cursor *cursor, ots_token_cb *cb,
 	if (!ok) return ok;
 
 	tok.type = TOK_VERSION;
-	tok.data.version = version;
+	tok.data.version.number = version;
+	tok.data.version.has_filehash = true;
 	(*cb)(&tok);
 
 	return 1;
@@ -367,12 +397,12 @@ enum decoder_state parse_ots_proof(const u8 *buf, int len, ots_token_cb *cb,
 	(*cb)(&token);
 
 	if (!consume_crypto_op(cursor, &token))
-	return cursor->state;
+		return cursor->state;
 
 	(*cb)(&token);
 
 	if (!consume_timestamp(cursor, &token, cb))
-	return cursor->state;
+		return cursor->state;
 
 	cursor->state = DECODER_PARSE_OK;
 	return cursor->state;
