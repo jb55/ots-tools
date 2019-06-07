@@ -23,7 +23,7 @@ static char strbuf[4096];
 
 void usage()
 {
-	printf("usage: otsmini [--upgraded,--keep-filehash] <proof.ots>\n");
+	printf("usage: otsmini [--upgraded,--no-filehash] <proof.ots>\n");
 	exit(1);
 }
 
@@ -207,7 +207,7 @@ int main(int argc, char *argv[])
 	int res;
 	struct mini_options options = {
 		.upgraded = false,
-		.strip_filehash = true,
+		.strip_filehash = false,
 	};
 
 	options.filehash.datalen = 0;
@@ -218,8 +218,8 @@ int main(int argc, char *argv[])
 	for (int i = 1; i < argc; i++) {
 		if (streq(argv[i], "--upgraded"))
 			options.upgraded = true;
-		else if (streq(argv[i], "--keep-filehash"))
-			options.strip_filehash = false;
+		else if (streq(argv[i], "--no-filehash"))
+			options.strip_filehash = true;
 		else if (streq(argv[i], "--filehash"))
 			parse_filehash(argv[(i++)+1], &options.filehash);
 		else if (streq(argv[i], "-d") || streq(argv[i], "--decode"))
