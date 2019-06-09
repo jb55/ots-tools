@@ -57,7 +57,7 @@ static void ots_encode_cb(struct token *token)
 
 	struct encoder *e = ots_encoder->encoder;
 
-	print_token(token, stderr);
+	/* print_token(token, stderr); */
 
 	switch (token->type) {
 	case TOK_VERSION:
