@@ -115,7 +115,7 @@ static char *attestation_type_name(enum attestation_type type) {
 	case ATTESTATION_LITECOIN_BLOCK_HEADER:
 		return "litecoin";
 	case ATTESTATION_PENDING:
-		return "pending";
+		return "calendar";
 	case ATTESTATION_UNKNOWN:
 		return "unknown";
 	}

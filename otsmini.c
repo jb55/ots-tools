@@ -35,7 +35,7 @@ static const char *mini_err_msg(enum mini_res res)
 	case MINI_ERR_OTS_PARSE_FAILED:
 		return decoder_errmsg;
 	case MINI_ERR_PENDING_NOT_FOUND:
-		return "pending attestation not found";
+		return "calendar attestation not found";
 	case MINI_ERR_UPGRADED_NOT_FOUND:
 		return "upgraded attestation not found";
 	}
