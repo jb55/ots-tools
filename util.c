@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <string.h>
 
 int read_fd(FILE *fd, unsigned char *buf, size_t buflen, size_t *written)
 {
@@ -27,6 +28,11 @@ int read_file_or_stdin(const char *filename, unsigned char *buf, size_t buflen,
 	FILE *file = NULL;
 	if (filename != NULL) {
 		file = fopen(filename, "rb");
+		if (file == NULL) {
+			*written = strlen(filename) + 1;
+			strncpy((char*)buf, filename, buflen);
+			return 1;
+		}
 		int ok = read_fd(file, buf, buflen, written);
 		fclose(file);
 		return ok;
