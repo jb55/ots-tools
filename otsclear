@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+# requires: opentimestamps-client(ots), base64, sed, awk, coreutils(truncate,cat)
+
+set -e
+
+usage () {
+    printf "usage: %s [OPTION] <file>\n" "$(basename $0)"
+    printf "\nOPTIONS\n\n"
+    printf "     --verify,-v   verify a cleartext ots timestamp\n"
+    printf "     --encode,-e   encode an ots file as a cleartext ots timestamp\n\n"
+}
+
+if [ -z $1 ]; then
+    usage
+fi
+
+ots_cleartext_msg () {
+    awk '/^-----BEGIN OPENTIMESTAMPS MESSAGE-----/,/^$/{f=1;next};/^-----BEGIN OPENTIMESTAMPS PROOF-----/{f=0}f' \
+        | sed 's,^- ,,'
+}
+
+ots_cleartext_verify() {
+    txt="$(mktemp)".txt
+    otsfile="$txt".ots
+    orig="$txt".orig
+    cat > "$orig"
+    <"$orig" ots_cleartext_msg | tee "$txt"
+    truncate -s -1 "$txt"
+    <"$orig" awk '/^-----BEGIN OPENTIMESTAMPS PROOF-----/,/^$/{f=1;next};/^-----END OPENTIMESTAMPS PROOF-----/{f=0}f' \
+        | base64 -d > "$otsfile"
+    ots verify "$otsfile"
+    rm -f "$txt" "$otsfile" "$orig"
+}
+
+ots_cleartext_encode() {
+    printf -- '-----BEGIN OPENTIMESTAMPS MESSAGE-----\n\n'
+    sed 's,^-,- -,' "$1"
+    printf -- '\n-----BEGIN OPENTIMESTAMPS PROOF-----\n\n'
+    base64 "$1.ots"
+    printf -- '-----END OPENTIMESTAMPS PROOF-----\n'
+}
+
+if [[ $1 == "-v" ]] || [[ $1 == "--verify" ]]; then
+    if [ -n "$2" ]; then
+        <$2 ots_cleartext_verify
+    else
+        ots_cleartext_verify
+    fi
+
+elif [[ $1 == "-e" ]] || [[ $1 == "--encode" ]]; then
+    if [ ! -n "$2" ]; then
+        printf "error: source filename required for otsclear --encode\n" >&2
+        exit 2
+    fi
+
+    filename=$(basename -- "$2")
+    extension="${filename##*.}"
+    filename="${2%.*}"
+
+    if [ "$extension" != "ots" ]; then
+        printf "error: encode expected ots file, got '%s'\n" "$extension" >&2
+        exit 3
+    fi
+
+    for file in $filename ${filename}.ots
+    do
+        if [ ! -e "$file" ]; then
+            printf "error: could not find %s\n" "$file" >&2
+            exit 3
+        fi
+    done
+
+    ots_cleartext_encode "$filename"
+else
+    usage
+fi
