@@ -230,7 +230,7 @@ int main(int argc, char *argv[])
 
 	if (decode) {
 		res = read_file_or_stdin(filename, (u8*)strbuf, sizeof(strbuf), &len);
-		strbuf[len] = 0;
+		strbuf[len-1] = 0;
 
 		if (res == 0)
 			fail(1, "input too large");
