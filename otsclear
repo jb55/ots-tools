@@ -8,6 +8,7 @@ usage () {
     printf "\nOPTIONS\n\n"
     printf "     --verify,-v   verify a cleartext ots timestamp\n"
     printf "     --encode,-e   encode an ots file as a cleartext ots timestamp\n\n"
+    exit 1
 }
 
 if [ -z $1 ]; then
@@ -25,7 +26,10 @@ ots_cleartext_verify() {
     orig="$txt".orig
     cat > "$orig"
     <"$orig" ots_cleartext_msg | tee "$txt"
+
+    # chop off any line endings that were added by the previous commands
     truncate -s -1 "$txt"
+
     <"$orig" awk '/^-----BEGIN OPENTIMESTAMPS PROOF-----/,/^$/{f=1;next};/^-----END OPENTIMESTAMPS PROOF-----/{f=0}f' \
         | base64 -d > "$otsfile"
     ots verify "$otsfile"
