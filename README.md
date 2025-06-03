@@ -74,3 +74,29 @@ prepend 683f0220
 append 2a8f10f27b04c2aa
 attestation calendar https://btc.calendar.catallaxy.com
 ```
+
+### Smaller
+
+You can create smaller otsmini stamps, but you need to provide a filehash when decoding them:
+
+```
+$ ./otsmini --no-filehash file.ots
+
+fPpRY4icNGkkZPkmHxwEc54DwmAzxmDSX4KgGGSN3iTHRenyF2Xa8M1WfR3ZLDcu5ixQcPgzSkAFzc4Q6dDFFaqCW1LS8aQ2ycJvQVMw3QasGNvEuETXqXTrKEBjDJzEcZA
+```
+
+```
+echo "fPpRY4icNGkkZPkmHxwEc54DwmAzxmDSX4KgGGSN3iTHRenyF2Xa8M1WfR3ZLDcu5ixQcPgzSkAFzc4Q6dDFFaqCW1LS8aQ2ycJvQVMw3QasGNvEuETXqXTrKEBjDJzEcZA" |
+  ./otsmini -d --filehash fb797ce014e3d782f0df30074de621f3577e30053b9a7e6e44cdc3ce572ffbbf |
+  ./otsprint
+
+version 1
+file_hash sha256 fb797ce014e3d782f0df30074de621f3577e30053b9a7e6e44cdc3ce572ffbbf
+append 95cd85698021fa4425b4eb3c5f71e1c5
+sha256
+append 4cef1eeed5499a43009f02d71daf1ad2
+sha256
+prepend 683f0220
+append 2a8f10f27b04c2aa
+attestation calendar https://btc.calendar.catallaxy.com
+```
