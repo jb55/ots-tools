@@ -4,6 +4,12 @@
 Some tools for working with opentimestamps formats. Right now there is a tool
 for parsing the opentimestamps serialized proof format.
 
+## Tools
+
+- *otsprint*: pretty print ots proof files
+- *otsmini*: create a small ascii proof for sharing online
+- *otsclear*: a script for creating plaintext ots proofs
+
 ## Examples
 
 ### Printing
@@ -52,6 +58,41 @@ append 5f7d7b98e9e065fb
 attestation calendar https://finney.calendar.eternitywall.com
 ```
 
+### Cleartext OTS format
+
+```
+$ otsclear -e CONTRIBUTING.ots
+-----BEGIN OPENTIMESTAMPS MESSAGE-----
+
+Email patches to William Casarin <jb55@jb55.com>
+
+-----BEGIN OPENTIMESTAMPS PROOF-----
+
+AE9wZW5UaW1lc3RhbXBzAABQcm9vZgC/ieLohOiSlAEILXj4GSagG6fRNnR+CHj9e/+Mdkp0w1us
+gV/5dmlX2NrwEDlcBMmQ723mI9sY9ALUlXoI//AQRXlCd716J60FudR+C78fkAjwIDnONJrj1udi
+NDxQQ8UJiS4ZWfprUxbvaIoBs4G+4u6kCPEEaD8Ft/AIeS/skaOtQRoAg9/jDS75DI4pKGh0dHBz
+Oi8vZmlubmV5LmNhbGVuZGFyLmV0ZXJuaXR5d2FsbC5jb23/8AhMLZVzYZMYqwjwEPKWanBNPZVm
+kqsAYV3LBbkI8CCfIVveDh/S8ykOH1NC6BKTerHoPojvj1OmjB2LYvdUbgjxBGg/BbbwCGoo3fi1
+A7rjAIPf4w0u+QyOLi1odHRwczovL2FsaWNlLmJ0Yy5jYWxlbmRhci5vcGVudGltZXN0YW1wcy5v
+cmf/8Aik+VP+n3FhCwjwELfTdHAfYQNa49I3CYycFbkI8QRoPwW28AgCLn93967lIQCD3+MNLvkM
+jiwraHR0cHM6Ly9ib2IuYnRjLmNhbGVuZGFyLm9wZW50aW1lc3RhbXBzLm9yZ/AQ3bEwg7mjQyKR
+PykGgiJewAjwID5Q68dY4m+XogwTJx72ecQEe5lheCO1RnlcJSTFokyRCPEEaD8Ft/AIw1WWPe++
+8N4Ag9/jDS75DI4jImh0dHBzOi8vYnRjLmNhbGVuZGFyLmNhdGFsbGF4eS5jb20=
+-----END OPENTIMESTAMPS PROOF-----
+```
+
+Verifying
+
+```
+$ ./otsclear -e CONTRIBUTING.ots | ./otsclear -v
+Email patches to William Casarin <jb55@jb55.com>
+
+Assuming target filename is '/tmp/tmp.KGxioekeUf.txt'
+Calendar https://finney.calendar.eternitywall.com: Pending confirmation in Bitcoin blockchain
+Calendar https://alice.btc.calendar.opentimestamps.org: Pending confirmation in Bitcoin blockchain
+Calendar https://bob.btc.calendar.opentimestamps.org: Pending confirmation in Bitcoin blockchain
+Calendar https://btc.calendar.catallaxy.com: Pending confirmation in Bitcoin blockchain
+```
 
 ### Minimizing
 
