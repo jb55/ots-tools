@@ -30,7 +30,7 @@ check: run-tests fake
 clean: fake
 	rm -f $(OBJS) otsprint otsmini
 
-TAGS: fake
-	etags -o - *.c > $@
+tags: fake
+	ctags *.c > $@
 
 .PHONY: fake
