@@ -1,7 +1,0 @@
-
-ots-tool
-========
-
-Some tools for working with opentimestamps formats. Right now there is a tool
-for parsing the opentimestamps serialized proof format.
-
