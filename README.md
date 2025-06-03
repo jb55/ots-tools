@@ -94,7 +94,9 @@ Calendar https://bob.btc.calendar.opentimestamps.org: Pending confirmation in Bi
 Calendar https://btc.calendar.catallaxy.com: Pending confirmation in Bitcoin blockchain
 ```
 
-### Minimizing
+### Mini OTS proofs
+
+otsmini is a tool for creating small strings that contain minimal ots proofs. Useful for sharing on social media, etc.
 
 ```
 $ ./otsmini file.ots
